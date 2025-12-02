@@ -1,0 +1,26 @@
+{
+  "name": "pinata",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+    ,"start": "ts-node server.ts", 
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@types/node": "^24.10.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "pinata": "^2.5.1",
+    "ts-node": "^10.9.2"
+  }
+}
