@@ -21,21 +21,14 @@ export function getPinataClient(): PinataSDK {
     });
 }
 
-export async function processLocalFile(filepath: string): Promise<ProcessedFile> {
-    try {
-        const content = await readFile(filepath);
-        const hash = createHash("sha256").update(content).digest("hex");
-
-        return {
-            content,
-            hash,
-            name: filepath,
-        };
-    } catch (error) {
-        throw new Error(`Failed to process file ${filepath}: ${error}`);
-    }
+export function processBuffer(content: Buffer, name: string): ProcessedFile {
+    const hash = createHash("sha256").update(content).digest("hex");
+    return {
+        content,
+        hash,
+        name,
+    };
 }
-
 export async function uploadToPinata(sdk: PinataSDK, fileData: ProcessedFile) {
     try {
         const fileArray = new Uint8Array(fileData.content);
@@ -49,28 +42,3 @@ export async function uploadToPinata(sdk: PinataSDK, fileData: ProcessedFile) {
         throw new Error(`Upload failed: ${error}`);
     }
 }
-
-async function main() {
-    const TARGET_FILE = "model.txt";
-
-    try {
-        //create pinata client
-        const pinata = getPinataClient();
-
-        //the target file will be a processed 
-        const fileData = await processLocalFile(TARGET_FILE);
-
-        console.log(`File to be uploaded:`, fileData);
-
-        const result = await uploadToPinata(pinata, fileData);
-        
-        console.log(`CID: ${result.cid}`);
-
-
-    } catch (error) {
-        console.error(error);
-        exit();
-    }
-}
-
-main();
