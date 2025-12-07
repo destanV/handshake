@@ -1,6 +1,5 @@
 import { PinataSDK } from "pinata";
 import dotenv from "dotenv";
-import {Multer} from "multer";
 import fs from "fs";
 
 dotenv.config();

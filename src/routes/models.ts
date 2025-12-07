@@ -1,6 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
-import multer, {Multer} from "multer";
-import crypto from "crypto";
+import multer from "multer";
 import fs from "fs";
 import { Model } from '../models/model.js';
 import { PinataService } from '../services/PinataService.js';
