@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node --loader ts-node/esm src/server.ts",
+    "start": "node --loader ts-node/esm src/server.ts --trace-warnings",
     "dev": "nodemon --exec node --loader ts-node/esm src/server.ts"
   },
   "keywords": [],
@@ -15,12 +15,14 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "mongoose": "^9.0.1",
     "multer": "^2.0.2",
     "pinata": "^2.5.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/mongoose": "^5.11.96",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.10.1",
     "ts-node": "^10.9.2",

@@ -1,9 +1,9 @@
 import express, { Request, Response, NextFunction } from "express";
 import multer from "multer";
 import fs from "fs";
-import { Model } from '../models/model.js';
 import { PinataService } from '../services/PinataService.js';
 import {calculateFileHash} from "../utilities/utilities.js";
+import Model, {IModelData} from "../models/model.js";
 
 const router = express.Router();
 const pinata = new PinataService();
@@ -20,12 +20,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-//in memory-db
-const models: Model[] = [
-    new Model({ id: 1, name: "GPT", type: "LLM", modelFileCid: null, modelHash: ""}),
-    new Model({ id: 2, name: "BERT", type: "LLM", modelFileCid: null, modelHash: "" })
-];
-
 interface RouteParams {
     id: string;
 }
@@ -37,24 +31,35 @@ const validateModel = (req:Request, res:Response, next: NextFunction) =>{
         next();
 }
 //GET all
-router.get('/', (req: Request, res: Response) => {
-    res.send(models);
+router.get('/', async (req: Request, res: Response) => {
+    try {
+        const models = await Model.find();
+        res.status(200).send(models)
+    } catch(e) {
+        console.error(e);
+        res.status(500).send({ error: "Server side error while fetching models." });
+    }
 });
 
 //GET by ID
-router.get('/:id', (req:Request<RouteParams>, res:Response) => {
+router.get('/:id', async (req:Request<RouteParams>, res:Response) => {
     const id = parseInt(req.params.id);
-    const model = models.find(m => m.id === id);
-
-    if(model)
-        return res.send(model)
-    else
-        return res.status(404).send(
-            {
-                "StatusCode": "404",
-                "Message": `Model with ${id} could not be found.`
-            }
-        )
+    try {
+        const model = await Model.findById(id);
+        if(model)
+            return res.send(model)
+        else
+            return res.status(404).send(
+                {
+                    "StatusCode": "404",
+                    "Message": `Model with ${id} could not be found.`
+                });
+    } catch (e) {
+        console.error(e);
+        return res.status(400).send({
+            error: "Invalid ID format or server error."
+        });
+    }
 });
 
 //POST (upload)
@@ -67,41 +72,41 @@ router.post('/', upload.single('model'), validateModel, async (req: Request, res
     try {
         const modelHash = await calculateFileHash(filePath)
 
-        const existingModel = models.find(m => m.modelHash === modelHash);
+        const existingModel = await Model.findOne({ modelHash });
         if (existingModel) {
             fs.unlinkSync(filePath) // sil
 
-            console.log(`Duplicate model detected: ${existingModel.id}`);
+            console.log(`Duplicate model detected: ${existingModel._id}`);
             return res.status(409).send(
             {
                 "StatusCode": "409",
                 "Message": "The model is already registered on the system.",
-                "Detail": `Model with the hash ${existingModel.modelHash} is already registered on the system. Id: ${existingModel.id}`
+                "Detail": `Model with the hash ${existingModel._id} is already registered on the system. Id: ${existingModel._id}`
             });
         }
 
         const modelFileResponse = await pinata.uploadFile(filePath, req.file.mimetype, req.file.originalname);
 
-        const newModel = new Model({
-            id: models.length + 1,
+        const modelData: Partial<IModelData> = {
             name: req.body.name,
             type: req.body.type,
+            ownerAddress: 'default_owner',
             modelFileCid: modelFileResponse.cid,
+            metadataCid: 'TEMP_CID',
             modelHash: modelHash
-        });
+        };
 
-        models.push(newModel);
+        const newModel = new Model(modelData);
 
-        const modelJson = await pinata.uploadJson(newModel.getModelJson());
+        const modelJson = await pinata.uploadJson(newModel.toObject());
+
+        newModel.metadataCid = modelJson.cid;
+
+        await newModel.save();
 
         fs.unlinkSync(filePath); //we're done with the model?
 
-        const response = {
-            ...newModel.getModelJson(),
-            metadataCid: modelJson.cid
-        };
-
-        return res.status(201).json(response);
+        return res.status(201).json(newModel.toObject());
 
     } catch (e) {
         console.error(e);
