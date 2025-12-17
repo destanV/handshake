@@ -1,6 +1,5 @@
 import { PinataSDK } from "pinata";
 import dotenv from "dotenv";
-import fs from "fs";
 
 dotenv.config();
 
@@ -14,23 +13,25 @@ export class PinataService {
         });
     }
 
-    public async uploadJson(json: object) {
+    public async uploadMetadata(metadata: object) {
         try {
-            return await this.client.upload.public.json(json);
+            const upload = await this.client.upload.public.json(metadata);
+            return upload.cid; 
         } catch (err) {
-            throw new Error(`Upload failed: ${err}`);
+            console.error("Metadata upload failed:", err);
+            throw new Error(`Metadata upload failed: ${err}`);
         }
     }
 
-    public async uploadFile(filetPath: string, mimeType: string, originalName: string) {
+    public async createSignedUrl(expireTime: number, fileName: string) {
         try {
-            const blob = await fs.openAsBlob(filetPath)
+            return await this.client.upload.public.createSignedURL({
+                expires: expireTime,
+                name: fileName
+            })
 
-            const file = new File([blob], originalName, { type: mimeType });
-
-            return await this.client.upload.public.file(file);
         } catch (err) {
-            throw new Error(`Upload failed: ${err}`);
+            throw new Error(`URL creating error: ${err}`)
         }
     }
 }

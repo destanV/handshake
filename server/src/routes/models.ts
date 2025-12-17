@@ -1,40 +1,18 @@
 import express, { Request, Response, NextFunction } from "express";
-import multer from "multer";
-import fs from "fs";
 import { PinataService } from '../services/PinataService.js';
-import {calculateFileHash} from "../utilities/utilities.js";
 import Model, {IModelData} from "../models/model.js";
+import { Types } from "mongoose";
 
 const router = express.Router();
-const pinata = new PinataService();
+const pinata = new PinataService()
 
-//Multer config
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/') // dosyalar buraya inecek
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now();
-        cb(null, file.originalname + "-" + uniqueSuffix) //unique olmalı)
-    }
-});
-
-const upload = multer({ storage: storage });
-interface RouteParams {
-    id: string;
-}
-
-const validateModel = (req:Request, res:Response, next: NextFunction) =>{
-    if (!req.body.name || !req.body.type || !req.file)
-        return res.status(400).send({ error: "Bad Request: required 'name', 'type', 'file' " });
-    else
-        next();
-}
-//GET all
+//GET All Models
 router.get('/', async (req: Request, res: Response) => {
     try {
         const models = await Model.find();
+
         res.status(200).send(models)
+        
     } catch(e) {
         console.error(e);
         res.status(500).send({ error: "Server side error while fetching models." });
@@ -42,77 +20,106 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 //GET by ID
-router.get('/:id', async (req:Request<RouteParams>, res:Response) => {
-    const id = parseInt(req.params.id);
+interface GetModelRouteParams {
+    id: string
+}
+router.get('/:id', async (req: Request<GetModelRouteParams>, res: Response) => {
     try {
-        const model = await Model.findById(id);
-        if(model)
-            return res.send(model)
-        else
-            return res.status(404).send(
-                {
-                    "StatusCode": "404",
-                    "Message": `Model with ${id} could not be found.`
-                });
+        const { id } = req.params;
+        if (!Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Invalid ID format" });
+        }
+
+        const model = await Model.findById(id).lean();
+        if (!model) {
+            return res.status(404).json({ message: "Model not found." });
+        }
+
+        return res.status(200).json(model);
+
     } catch (e) {
-        console.error(e);
-        return res.status(400).send({
-            error: "Invalid ID format or server error."
-        });
+        console.error("GetById Error:", e);
+        return res.status(500).json({ error: "Server error." });
     }
 });
 
-//POST (upload)
-router.post('/', upload.single('model'), validateModel, async (req: Request, res: Response) => {
-    if(!req.file)
-        return res.status(400).send("File is missing");
-
-    const filePath = req.file.path;
-
+//GET CheckModelByHash
+router.get('/check', async (req: Request, res: Response) => {
     try {
-        const modelHash = await calculateFileHash(filePath)
+        const hash = req.query.hash;
+        if (!hash) {
+            return res.status(400).send({ error: "Hash required" });
+        }
 
-        const existingModel = await Model.findOne({ modelHash });
-        if (existingModel) {
-            fs.unlinkSync(filePath) // sil
+        const exists = await Model.exists({ modelHash: hash });
 
-            console.log(`Duplicate model detected: ${existingModel._id}`);
-            return res.status(409).send(
-            {
-                "StatusCode": "409",
-                "Message": "The model is already registered on the system.",
-                "Detail": `Model with the hash ${existingModel._id} is already registered on the system. Id: ${existingModel._id}`
+        res.status(200).json({ exists: !!exists });
+
+    } catch (e) {
+        res.status(500).json({ error: "Check failed" });
+    }
+});
+
+//POST Confirm model 
+router.post('/confirm', async (req:Request, res:Response) => {
+    try {
+        const {
+            name,
+            type,
+            modelFileCid,
+            size,
+            hash,
+            ownerAddress
+        } = req.body;
+
+        if (!name || !modelFileCid || !hash || !ownerAddress) {
+            return res.status(400).json({
+                error: "Missing required fields (name, cid, hash, ownerAddress)"
             });
         }
 
-        const modelFileResponse = await pinata.uploadFile(filePath, req.file.mimetype, req.file.originalname);
+        const duplicate = await Model.findOne({modelHash: hash});
+        if (duplicate) {
+            return res.status(409).json({
+                error: "Model with this hash already exists.",
+                existingModelId: duplicate._id
+            });
+        }
 
-        const modelData: Partial<IModelData> = {
-            name: req.body.name,
-            type: req.body.type,
-            ownerAddress: 'default_owner',
-            modelFileCid: modelFileResponse.cid,
-            metadataCid: 'TEMP_CID',
-            modelHash: modelHash
+        const metadataPayload = {
+            name,
+            description: `Uploaded to Handshake by ${ownerAddress}`,
+            externalUrl: `https://ipfs.io/ipfs/${modelFileCid}`,
+            attributes: [ // OpenSea format
+                { trait_type: "Type", value: type || "AI Model" },
+                { trait_type: "Size", value: size },
+                { trait_type: "Hash", value: hash },
+                { trait_type: "Date", value: new Date().toISOString() }
+            ]
         };
 
-        const newModel = new Model(modelData);
+        const metadataCid = await pinata.uploadMetadata(metadataPayload);
 
-        const modelJson = await pinata.uploadJson(newModel.toObject());
-
-        newModel.metadataCid = modelJson.cid;
+        const newModel = new Model({
+            name,
+            type: type, 
+            ownerAddress,
+            modelFileCid: modelFileCid,      
+            metadataCid: metadataCid, 
+            modelHash: hash,
+            size: size,
+            likes: 0
+        });
 
         await newModel.save();
 
-        fs.unlinkSync(filePath); //we're done with the model?
+        console.log(`New Model Confirmed: ${name} (${newModel._id})`);
 
-        return res.status(201).json(newModel.toObject());
-
+        return res.status(201).json(newModel);
     } catch (e) {
-        console.error(e);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        res.status(500).send({ error: "Server side error." });
+        console.error("Confirm error:", e);
+        return res.status(500).json({ error: "Could not register model to the system." });
     }
-});
+})
 
 export default router;
