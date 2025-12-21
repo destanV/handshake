@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import { PinataService } from '../services/PinataService.js';
 import Model, {IModelData} from "../models/model.js";
 import { Types } from "mongoose";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 const pinata = new PinataService()
@@ -61,7 +62,7 @@ router.get('/check', async (req: Request, res: Response) => {
 });
 
 //POST Confirm model 
-router.post('/confirm', async (req:Request, res:Response) => {
+router.post('/confirm', authMiddleware,  async (req:Request, res:Response) => {
     try {
         const {
             name,
@@ -69,14 +70,15 @@ router.post('/confirm', async (req:Request, res:Response) => {
             modelFileCid,
             size,
             hash,
-            ownerAddress
         } = req.body;
 
-        if (!name || !modelFileCid || !hash || !ownerAddress) {
+        if (!name || !modelFileCid || !hash) {
             return res.status(400).json({
-                error: "Missing required fields (name, cid, hash, ownerAddress)"
+                error: "Missing required fields (name, cid, hash)"
             });
         }
+
+        const ownerAddress = req.wallet!;
 
         const duplicate = await Model.findOne({modelHash: hash});
         if (duplicate) {
@@ -88,7 +90,7 @@ router.post('/confirm', async (req:Request, res:Response) => {
 
         const metadataPayload = {
             name,
-            description: `Uploaded to Handshake by ${ownerAddress}`,
+            description: `Uploaded to Handshake by ${req.wallet}`,
             externalUrl: `https://ipfs.io/ipfs/${modelFileCid}`,
             attributes: [ // OpenSea format
                 { trait_type: "Type", value: type || "AI Model" },
