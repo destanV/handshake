@@ -1,10 +1,11 @@
 import express, { Request, Response, NextFunction } from "express";
 import { PinataService } from "../services/PinataService.js";
 import { HttpStatusCode } from "axios";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get('/signed-url', async (req: Request, res: Response) => {
+router.get('/signed-url', authMiddleware,  async (req: Request, res: Response) => {
     try {
         const fileName = req.query.fileName as string;
         if (!fileName) {

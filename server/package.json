@@ -20,14 +20,18 @@
     "mongoose": "^9.0.1",
     "multer": "^2.0.2",
     "pinata": "^2.5.1",
+    "pino": "^10.1.0",
+    "siwe": "^3.0.0",
     "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/mongoose": "^5.11.96",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.10.1",
+    "cookie-parser": "^1.4.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

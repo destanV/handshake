@@ -1,12 +1,13 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import { PinataService } from '../services/PinataService.js';
-import Model, {IModelData} from "../models/model.js";
+import Model from "../data/Model.js";
 import { Types } from "mongoose";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 const pinata = new PinataService()
 
-//GET All Models
+//GET All DataModels
 router.get('/', async (req: Request, res: Response) => {
     try {
         const models = await Model.find();
@@ -15,7 +16,26 @@ router.get('/', async (req: Request, res: Response) => {
         
     } catch(e) {
         console.error(e);
-        res.status(500).send({ error: "Server side error while fetching models." });
+        res.status(500).send({ error: "Server side error while fetching data." });
+    }
+});
+
+//GET CheckModelByHash
+router.get('/check/:hash', async (req: Request, res: Response) => {
+    try {
+        const { hash } = req.params;
+
+        if (!hash) {
+            return res.status(400).json({ error: "Hash required" });
+        }
+
+        const exists = await Model.exists({ modelHash: hash });
+
+        return res.status(200).json({ exists: !!exists });
+
+    } catch (e) {
+        console.error('Check hash error:', e);
+        return res.status(500).json({ error: "Check failed" });
     }
 });
 
@@ -43,25 +63,8 @@ router.get('/:id', async (req: Request<GetModelRouteParams>, res: Response) => {
     }
 });
 
-//GET CheckModelByHash
-router.get('/check', async (req: Request, res: Response) => {
-    try {
-        const hash = req.query.hash;
-        if (!hash) {
-            return res.status(400).send({ error: "Hash required" });
-        }
-
-        const exists = await Model.exists({ modelHash: hash });
-
-        res.status(200).json({ exists: !!exists });
-
-    } catch (e) {
-        res.status(500).json({ error: "Check failed" });
-    }
-});
-
 //POST Confirm model 
-router.post('/confirm', async (req:Request, res:Response) => {
+router.post('/confirm', authMiddleware,  async (req:Request, res:Response) => {
     try {
         const {
             name,
@@ -69,14 +72,15 @@ router.post('/confirm', async (req:Request, res:Response) => {
             modelFileCid,
             size,
             hash,
-            ownerAddress
         } = req.body;
 
-        if (!name || !modelFileCid || !hash || !ownerAddress) {
+        if (!name || !modelFileCid || !hash) {
             return res.status(400).json({
-                error: "Missing required fields (name, cid, hash, ownerAddress)"
+                error: "Missing required fields (name, cid, hash)"
             });
         }
+
+        const ownerAddress = req.wallet!;
 
         const duplicate = await Model.findOne({modelHash: hash});
         if (duplicate) {
@@ -88,7 +92,7 @@ router.post('/confirm', async (req:Request, res:Response) => {
 
         const metadataPayload = {
             name,
-            description: `Uploaded to Handshake by ${ownerAddress}`,
+            description: `Uploaded to Handshake by ${req.wallet}`,
             externalUrl: `https://ipfs.io/ipfs/${modelFileCid}`,
             attributes: [ // OpenSea format
                 { trait_type: "Type", value: type || "AI Model" },

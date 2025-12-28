@@ -1,7 +1,9 @@
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import modelRouter from './routes/models.js';
+import authRouter from './routes/auth.js'
 import pinataAuth from './routes/pinataAuth.js'
 import dotenv from 'dotenv'
 
@@ -20,10 +22,15 @@ const connectDB = async () => {
     }
 }
 
-app.use(cors());
+app.use(cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 app.use('/models', modelRouter);
 app.use('/pinata-auth', pinataAuth);
+app.use('/auth', authRouter);
 
 const startServer = async () => {
 
