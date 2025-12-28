@@ -2,7 +2,6 @@
 
 import { WalletButton } from "@/components/WalletButton";
 import { UploadModal } from "@/components/UploadModal"
-import { useAccount } from "wagmi"
 import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { apiService } from "@/services/ApiService"
