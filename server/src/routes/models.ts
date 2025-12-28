@@ -1,13 +1,13 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import { PinataService } from '../services/PinataService.js';
-import Model, {IModelData} from "../models/model.js";
+import Model from "../data/Model.js";
 import { Types } from "mongoose";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 const pinata = new PinataService()
 
-//GET All Models
+//GET All DataModels
 router.get('/', async (req: Request, res: Response) => {
     try {
         const models = await Model.find();
@@ -16,7 +16,26 @@ router.get('/', async (req: Request, res: Response) => {
         
     } catch(e) {
         console.error(e);
-        res.status(500).send({ error: "Server side error while fetching models." });
+        res.status(500).send({ error: "Server side error while fetching data." });
+    }
+});
+
+//GET CheckModelByHash
+router.get('/check/:hash', async (req: Request, res: Response) => {
+    try {
+        const { hash } = req.params;
+
+        if (!hash) {
+            return res.status(400).json({ error: "Hash required" });
+        }
+
+        const exists = await Model.exists({ modelHash: hash });
+
+        return res.status(200).json({ exists: !!exists });
+
+    } catch (e) {
+        console.error('Check hash error:', e);
+        return res.status(500).json({ error: "Check failed" });
     }
 });
 
@@ -41,23 +60,6 @@ router.get('/:id', async (req: Request<GetModelRouteParams>, res: Response) => {
     } catch (e) {
         console.error("GetById Error:", e);
         return res.status(500).json({ error: "Server error." });
-    }
-});
-
-//GET CheckModelByHash
-router.get('/check', async (req: Request, res: Response) => {
-    try {
-        const hash = req.query.hash;
-        if (!hash) {
-            return res.status(400).send({ error: "Hash required" });
-        }
-
-        const exists = await Model.exists({ modelHash: hash });
-
-        res.status(200).json({ exists: !!exists });
-
-    } catch (e) {
-        res.status(500).json({ error: "Check failed" });
     }
 });
 

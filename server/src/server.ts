@@ -24,7 +24,7 @@ const connectDB = async () => {
 
 app.use(cors({
     origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    credentials: true  
+    credentials: true
 }));
 app.use(express.json());
 app.use(cookieParser());

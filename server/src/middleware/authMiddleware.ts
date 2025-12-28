@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import Session from "../models/Session.js";
+import Session from "../data/Session.js";
 
 //to identify req.wallet
 declare global {

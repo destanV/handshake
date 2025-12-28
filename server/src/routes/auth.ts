@@ -1,7 +1,7 @@
-import express, {Request, response, Response} from 'express';
+import express, {Request, Response} from 'express';
 import crypto from 'crypto';
-import Nonce from '../models/Nonce.js';
-import Session from '../models/Session.js';
+import Nonce from '../data/Nonce.js'
+import Session from '../data/Session.js';
 import { AuthService } from '../services/AuthService.js';
 
 const router = express.Router();
@@ -23,8 +23,8 @@ router.get('/nonce', async (req:Request, res:Response) => {
         return res.status(200).json({nonce, expiresAt});
 
     } catch (error) {
-        console.error("Nonce generation error: ", error);
-        return res.status(500).json({error: "Failed to generate nonce"});        
+        console.error('Nonce generation error: ', error);
+        return res.status(500).json({error: 'Failed to generate nonce'});
     }
 });
 
@@ -54,8 +54,9 @@ router.post('/verify', async (req:Request, res:Response) => {
         res.cookie('session', sessionId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 24 * 60 * 60 * 1000
+            sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+            maxAge: 24 * 60 * 60 * 1000,
+            path: '/'
         });
 
         return res.status(200).json({
@@ -69,6 +70,33 @@ router.post('/verify', async (req:Request, res:Response) => {
     }
 });
 
+router.get('/me', async (req:Request, res:Response) => {
+    try {
+        const sessionId = req.cookies.session;
+        if (!sessionId) {
+            return res.status(401).json({authenticated: false});
+        }
+
+        const session = await Session.findOne({
+            sessionId,
+            expiresAt: { $gt: new Date() }
+        });
+
+        if (!session) {
+            return res.status(401).json({authenticated: false});
+        }
+
+        return res.status(200).json({
+            authenticated: true,
+            walletAddress: session.walletAddress
+        });
+
+    } catch (error) {
+        console.error('Session check error:', error);
+        return res.status(500).json({ authenticated: false });
+    }
+});
+
 router.post('/logout', async (req:Request, res:Response) => {
     try {
         const sessionId = req.cookies.session;
@@ -79,7 +107,7 @@ router.post('/logout', async (req:Request, res:Response) => {
         res.clearCookie('session');
 
         return res.status(200).json({success: true});
-        
+
     } catch (error) {
         console.error('Logout error:', error);
         return res.status(500).json({ error: 'Logout failed' });

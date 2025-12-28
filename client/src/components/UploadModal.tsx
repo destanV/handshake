@@ -1,7 +1,9 @@
 "use client"
+
 //Components
-import { useState, useCallback } from "react"
+import React, { useState, useCallback } from "react"
 import { useDropzone } from "react-dropzone"
+import { useAccount } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -13,11 +15,12 @@ import { PinataService } from "@/services/PinataService"
 import { calculateFileHash } from "@/utils/hashHelper"
 
 export function UploadModal() {
+    const { address, isConnected } = useAccount()
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [status, setStatus] = useState("")
     const [file, setFile] = useState<File | null>(null)
-    
+
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles?.[0]) {
             setFile(acceptedFiles[0])
@@ -26,20 +29,22 @@ export function UploadModal() {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        maxFiles: 1, 
-        accept: { 'application/octet-stream': ['.safetensors', '.bin', '.pth'] } 
+        maxFiles: 1,
+        accept: { 'application/octet-stream': ['.safetensors', '.bin', '.pth'] }
     })
 
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!file) 
+        if (!file)
             return alert("Please select a file")
-        console.log("Selected file:", file.name)
+
+        if (!isConnected || !address) {
+            return alert("Please connect your wallet and sign in first!")
+        }
 
         const form = e.target as HTMLFormElement;
         const name = (form.elements.namedItem("name") as HTMLInputElement).value;
         const type = (form.elements.namedItem("type") as HTMLInputElement).value;
-        const ownerAddress = (form.elements.namedItem("ownerAddress") as HTMLInputElement).value;
 
         setLoading(true)
         setStatus("Inspecting file...")
@@ -50,7 +55,7 @@ export function UploadModal() {
             console.log("Calculated Hash:", fileHash);
 
             setStatus("Checking validity...");
-            const modelCheckResponse = await apiService.get<{exists: boolean}>(`models/check`, {hash: fileHash})
+            const modelCheckResponse = await apiService.checkModelHash(fileHash)
 
             if (modelCheckResponse.exists) {
                 alert("This model already exists on the system. Upload rejected!");
@@ -62,7 +67,7 @@ export function UploadModal() {
             console.log("File unique, try to fetch get a signed url...");
 
             setStatus("Authorizing for uploading the file...")
-            const authRes = await apiService.get<{signedUrl:string}>('pinata-auth/signed-url', {fileName: file.name})
+            const authRes = await apiService.getPinataSignedUrl(file.name)
 
             setStatus("Uploading file to Pinata...");
             const pinataService = new PinataService();
@@ -70,13 +75,12 @@ export function UploadModal() {
 
             setStatus("System processes your model...");
 
-            await apiService.post('/models/confirm', {
+            await apiService.confirmModel({
                 name,
                 type,
                 modelFileCid: uploadResult.cid,
                 size: file.size,
-                hash: fileHash,
-                ownerAddress
+                hash: fileHash
             });
 
             alert("Success!");
@@ -130,14 +134,18 @@ export function UploadModal() {
                     </div>
 
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="ownerAddress" className="">Your Address</Label>
-                        <Input
-                            id="ownerAddress"
-                            name="ownderAddress"
-                            placeholder="0x812739182739182739"
-                            className="col-span-3"
-                            required
-                        />
+                        <Label className="text-right">Wallet</Label>
+                        <div className="col-span-3">
+                            {isConnected && address ? (
+                                <span className="text-sm font-mono text-green-600">
+                                    {address.slice(0, 6)}...{address.slice(-4)} ✓
+                                </span>
+                            ) : (
+                                <span className="text-sm text-red-500">
+                                    Not connected - Please connect wallet first
+                                </span>
+                            )}
+                        </div>
                     </div>
 
 
@@ -170,11 +178,11 @@ export function UploadModal() {
                             </div>
                         </div>
                     </div>
-                    <Button type="submit" className="mt-4" disabled={loading}>
+                    <Button type="submit" className="mt-4" disabled={loading || !address}>
                         {loading ? status : "Check Validity & Upload"}
                     </Button>
                 </form>
             </DialogContent>
         </Dialog>
-      )
+    )
 }

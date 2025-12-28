@@ -1,6 +1,6 @@
 import { SiweMessage } from "siwe";
 import { CHAIN_IDS } from "../constants/AppConstants.js";
-import Nonce from "../models/Nonce.js";
+import Nonce from "../data/Nonce.js";
 
 export class AuthService {
     /**
