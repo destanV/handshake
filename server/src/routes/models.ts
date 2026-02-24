@@ -72,9 +72,10 @@ router.post('/confirm', authMiddleware,  async (req:Request, res:Response) => {
             modelFileCid,
             size,
             hash,
+            originalName
         } = req.body;
 
-        if (!name || !modelFileCid || !hash) {
+        if (!name || !modelFileCid || !hash||!originalName) {
             return res.status(400).json({
                 error: "Missing required fields (name, cid, hash)"
             });
@@ -98,7 +99,8 @@ router.post('/confirm', authMiddleware,  async (req:Request, res:Response) => {
                 { trait_type: "Type", value: type || "AI Model" },
                 { trait_type: "Size", value: size },
                 { trait_type: "Hash", value: hash },
-                { trait_type: "Date", value: new Date().toISOString() }
+                { trait_type: "Date", value: new Date().toISOString() },
+                { trait_type: "Original File", value: originalName }
             ]
         };
 
@@ -106,7 +108,8 @@ router.post('/confirm', authMiddleware,  async (req:Request, res:Response) => {
 
         const newModel = new Model({
             name,
-            type: type, 
+            type: type,
+            originalName: originalName, 
             ownerAddress,
             modelFileCid: modelFileCid,      
             metadataCid: metadataCid, 

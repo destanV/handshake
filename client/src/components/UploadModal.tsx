@@ -80,7 +80,8 @@ export function UploadModal() {
                 type,
                 modelFileCid: uploadResult.cid,
                 size: file.size,
-                hash: fileHash
+                hash: fileHash,
+                originalName: file.name
             });
 
             alert("Success!");

@@ -4,6 +4,7 @@ export interface IModelData extends Document {
     name:           string;
     type:           string;
     description?:   string;
+    originalName: string;
 
     //provenance
     ownerAddress:   string;
@@ -25,6 +26,7 @@ const ModelSchema: Schema = new Schema({
     name:           {type: String, required: true, index: true},
     type:           {type: String, required: true, index: true}, // index to query fast for a type:  LLMs, Images
     description:    {type:String},
+    originalName: {type:String,required:true},
 
     ownerAddress:   {type: String, required: true, index: true, lowercase: true},
     modelFileCid:   {type: String, required: true},

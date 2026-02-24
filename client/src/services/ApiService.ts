@@ -97,6 +97,7 @@ class ApiService {
         modelFileCid: string;
         size: number;
         hash: string;
+        originalName: string;
     }) {
         return this.post('/models/confirm', data);
     }
