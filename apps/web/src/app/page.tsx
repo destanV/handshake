@@ -3,8 +3,11 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ShaderAnimation } from "@/components/ui/shader-lines"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth()
+
   return (
     <div className="relative h-svh w-full overflow-hidden flex items-center justify-center">
       <ShaderAnimation />
@@ -29,9 +32,15 @@ export default function LandingPage() {
           <Button
             size="lg"
             className="bg-white/10 text-white border border-white/20 hover:bg-white/20 backdrop-blur-sm"
-            asChild
+            disabled={!isAuthenticated}
+            asChild={isAuthenticated}
+            title={!isAuthenticated ? "Connect your wallet to upload" : undefined}
           >
-            <Link href="/upload">Upload a Model</Link>
+            {isAuthenticated ? (
+              <Link href="/upload">Upload a Model</Link>
+            ) : (
+              <span>Upload a Model</span>
+            )}
           </Button>
         </div>
       </div>

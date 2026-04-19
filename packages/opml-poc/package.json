@@ -1,0 +1,21 @@
+{
+  "name": "@handshake/opml-poc",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test":    "hardhat test",
+    "demo":    "hardhat run scripts/demo.ts",
+    "node":    "hardhat node",
+    "clean":   "hardhat clean"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.0.0"
+  }
+}

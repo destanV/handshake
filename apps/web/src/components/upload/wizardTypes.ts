@@ -7,6 +7,7 @@ import type {
   IDataset,
   IBenchmark,
 } from "@handshake/types"
+import type { ManifestEntry } from "@/utils/blake3"
 
 export type UploadStatus =
   | "idle"
@@ -23,11 +24,12 @@ export type LineageType = "from_scratch" | "derived"
 export interface WizardState {
   step: 1 | 2 | 3 | 4 | 5
 
-  // Step 1 — File
-  file: File | null
-  modelHash: string
+  // Step 1 — File(s)
+  files: File[]
+  manifestEntries: ManifestEntry[]
+  modelHash: string       // blake3 of the manifest JSON (covers all files)
   hashStatus: HashStatus
-  hashProgress: number // 0-100
+  hashProgress: number    // 0-100
   duplicateStatus: DuplicateStatus
 
   // Step 2 — Identity
@@ -69,9 +71,10 @@ export interface WizardState {
 
 export type WizardAction =
   | { type: "SET_STEP"; step: WizardState["step"] }
-  | { type: "SET_FILE"; file: File }
+  | { type: "SET_FILES"; files: File[] }
+  | { type: "REMOVE_FILE"; index: number }
   | { type: "SET_HASH_PROGRESS"; progress: number }
-  | { type: "SET_HASH_DONE"; hash: string }
+  | { type: "SET_HASH_DONE"; hash: string; entries: ManifestEntry[] }
   | { type: "SET_DUPLICATE_STATUS"; status: DuplicateStatus }
   | {
       type: "PATCH_IDENTITY"

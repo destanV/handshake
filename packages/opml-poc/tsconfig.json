@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "target": "ES2021"
+  },
+  "include": ["hardhat.config.ts", "test/**/*.ts", "scripts/**/*.ts"]
+}

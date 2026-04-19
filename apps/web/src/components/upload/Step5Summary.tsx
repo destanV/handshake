@@ -119,11 +119,17 @@ export function Step5Summary({ state, dispatch }: Props) {
 
           {/* File */}
           <div className="rounded-xl border border-border bg-card/50 p-4 space-y-1.5">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">File</p>
-            <p className="text-sm font-medium">{state.file?.name}</p>
-            <p className="text-xs text-muted-foreground">{state.file ? formatBytes(state.file.size) : ""}</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {state.files.length === 1 ? "File" : `Files (${state.files.length})`}
+            </p>
+            {state.files.map((f) => (
+              <p key={f.name} className="text-sm font-medium truncate">{f.name}</p>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              {formatBytes(state.files.reduce((s, f) => s + f.size, 0))} total
+            </p>
             <p className="font-mono text-xs text-muted-foreground break-all">
-              {state.modelHash.slice(0, 20)}…{state.modelHash.slice(-8)}
+              manifest: {state.modelHash.slice(0, 20)}…{state.modelHash.slice(-8)}
             </p>
           </div>
 

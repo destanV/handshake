@@ -17,7 +17,7 @@ function buildDTO(state: WizardState, modelFileCid: string): CreateModelDTO {
     baseModel: state.lineageType === "from_scratch" ? [] : state.baseModel,
   }
 
-  if (state.file) dto.size = state.file.size
+  if (state.files.length) dto.size = state.files.reduce((sum, f) => sum + f.size, 0)
   if (state.modelType.trim()) dto.modelType = state.modelType.trim()
   if (state.parameters.trim()) dto.parameters = state.parameters.trim()
   if (state.contextLength) dto.contextLength = parseInt(state.contextLength, 10)
@@ -94,14 +94,17 @@ export function useWizardUpload(
   dispatch: Dispatch<WizardAction>
 ) {
   async function uploadModel() {
-    if (!state.file) return
+    if (!state.files.length) return
+
+    // Upload the largest file (model weights) as the primary IPFS artifact
+    const primaryFile = [...state.files].sort((a, b) => b.size - a.size)[0]
 
     try {
       dispatch({ type: "SET_UPLOAD_STATUS", status: "getting_url" })
-      const { signedUrl } = await fetchSignedUrl(state.file.name)
+      const { signedUrl } = await fetchSignedUrl(primaryFile.name)
 
       dispatch({ type: "SET_UPLOAD_STATUS", status: "uploading_file" })
-      const cid = await uploadToIPFS(state.file, signedUrl, (pct) => {
+      const cid = await uploadToIPFS(primaryFile, signedUrl, (pct) => {
         dispatch({ type: "SET_UPLOAD_PROGRESS", progress: pct })
       })
 

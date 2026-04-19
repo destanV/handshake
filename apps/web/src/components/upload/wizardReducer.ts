@@ -2,7 +2,8 @@ import type { WizardState, WizardAction } from "./wizardTypes"
 
 export const initialState: WizardState = {
   step: 1,
-  file: null,
+  files: [],
+  manifestEntries: [],
   modelHash: "",
   hashStatus: "idle",
   hashProgress: 0,
@@ -38,15 +39,31 @@ export function wizardReducer(
     case "SET_STEP":
       return { ...state, step: action.step }
 
-    case "SET_FILE":
+    case "SET_FILES": {
+      const files = action.files
       return {
         ...state,
-        file: action.file,
+        files,
+        manifestEntries: [],
         modelHash: "",
-        hashStatus: "hashing",
+        hashStatus: files.length > 0 ? "hashing" : "idle",
         hashProgress: 0,
         duplicateStatus: "idle",
       }
+    }
+
+    case "REMOVE_FILE": {
+      const files = state.files.filter((_, i) => i !== action.index)
+      return {
+        ...state,
+        files,
+        manifestEntries: [],
+        modelHash: "",
+        hashStatus: files.length > 0 ? "hashing" : "idle",
+        hashProgress: 0,
+        duplicateStatus: "idle",
+      }
+    }
 
     case "SET_HASH_PROGRESS":
       return { ...state, hashProgress: action.progress }
@@ -55,6 +72,7 @@ export function wizardReducer(
       return {
         ...state,
         modelHash: action.hash,
+        manifestEntries: action.entries,
         hashStatus: "done",
         duplicateStatus: "checking",
       }

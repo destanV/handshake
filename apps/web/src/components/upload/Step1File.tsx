@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState, type Dispatch } from "react"
-import { UploadCloudIcon, FileIcon, CheckCircle2Icon, AlertCircleIcon, Loader2Icon } from "lucide-react"
+import { UploadCloudIcon, FileIcon, CheckCircle2Icon, AlertCircleIcon, Loader2Icon, XIcon, PlusIcon } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
-import { hashFile } from "@/utils/blake3"
+import { hashManifest } from "@/utils/blake3"
 import { checkModelHash } from "@/services/api"
 import type { WizardState, WizardAction } from "./wizardTypes"
 
@@ -23,25 +23,26 @@ interface Props {
 
 export function Step1File({ state, dispatch }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const addMoreRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
-  // Trigger hashing when a file is set
+  // Trigger hashing whenever files change and status is "hashing"
   useEffect(() => {
-    if (!state.file || state.hashStatus !== "hashing") return
+    if (!state.files.length || state.hashStatus !== "hashing") return
     let cancelled = false
 
-    hashFile(state.file, (pct) => {
+    hashManifest(state.files, (pct) => {
       if (!cancelled) dispatch({ type: "SET_HASH_PROGRESS", progress: pct })
     })
-      .then((hash) => {
-        if (!cancelled) dispatch({ type: "SET_HASH_DONE", hash })
+      .then(({ manifestHash, entries }) => {
+        if (!cancelled) dispatch({ type: "SET_HASH_DONE", hash: manifestHash, entries })
       })
       .catch(() => {
-        if (!cancelled) dispatch({ type: "SET_ERROR", message: "Failed to hash file" })
+        if (!cancelled) dispatch({ type: "SET_ERROR", message: "Failed to hash files" })
       })
 
     return () => { cancelled = true }
-  }, [state.file, state.hashStatus, dispatch])
+  }, [state.files, state.hashStatus, dispatch])
 
   // Check duplicate after hash is done
   useEffect(() => {
@@ -60,34 +61,36 @@ export function Step1File({ state, dispatch }: Props) {
     return () => { cancelled = true }
   }, [state.duplicateStatus, state.modelHash, dispatch])
 
-  function handleFile(file: File) {
-    dispatch({ type: "SET_FILE", file })
+  function handleFiles(incoming: FileList | null) {
+    if (!incoming || incoming.length === 0) return
+    const next = Array.from(incoming)
+    // Merge with existing files, deduplicate by name
+    const existing = state.files.filter(
+      (f) => !next.some((n) => n.name === f.name)
+    )
+    dispatch({ type: "SET_FILES", files: [...existing, ...next] })
   }
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
+    handleFiles(e.dataTransfer.files)
   }
 
-  function onInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
-  }
-
-  const isIdle = !state.file
+  const isIdle = state.files.length === 0
   const isHashing = state.hashStatus === "hashing"
   const isDuplicate = state.duplicateStatus === "duplicate"
   const isOk = state.hashStatus === "done" && state.duplicateStatus === "ok"
   const isChecking = state.duplicateStatus === "checking"
 
+  const totalSize = state.files.reduce((s, f) => s + f.size, 0)
+
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Upload Model File</h2>
+        <h2 className="text-lg font-semibold">Upload Model Files</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Your file is hashed locally — it never touches our servers unencrypted.
+          Select all files that define your model. Each file is hashed locally — nothing leaves your browser until you confirm.
         </p>
       </div>
 
@@ -110,61 +113,90 @@ export function Step1File({ state, dispatch }: Props) {
             <UploadCloudIcon className="size-7 text-muted-foreground" />
           </div>
           <div className="text-center space-y-1">
-            <p className="text-sm font-medium">Drop your model file here</p>
+            <p className="text-sm font-medium">Drop your model files here</p>
             <p className="text-xs text-muted-foreground">
+              weights · config · tokenizer · or any combination
+            </p>
+            <p className="text-xs text-muted-foreground/60">
               {ACCEPTED_EXTENSIONS.join("  ·  ")}
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px w-12 bg-border" />
-            or
+            or click to browse
             <span className="h-px w-12 bg-border" />
           </div>
-          <p className="text-xs text-muted-foreground/60">Max 25 GB</p>
           <input
             ref={inputRef}
             type="file"
+            multiple
             accept={ACCEPTED_EXTENSIONS.join(",")}
             className="hidden"
-            onChange={onInputChange}
+            onChange={(e) => handleFiles(e.target.files)}
           />
         </div>
       ) : (
         <div className="rounded-xl border border-border bg-card/50 p-5 space-y-4">
-          {/* File header */}
-          <div className="flex items-start gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5">
-              {isOk ? (
-                <CheckCircle2Icon className="size-5 text-tx-confirmed" />
-              ) : isDuplicate ? (
-                <AlertCircleIcon className="size-5 text-destructive" />
-              ) : (
-                <FileIcon className="size-5 text-muted-foreground" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium truncate">{state.file?.name}</p>
-              <p className="text-xs text-muted-foreground">{state.file ? formatBytes(state.file.size) : ""}</p>
-            </div>
+          {/* File list */}
+          <div className="space-y-2">
+            {state.files.map((file, i) => {
+              const entry = state.manifestEntries.find((e) => e.name === file.name)
+              return (
+                <div key={file.name} className="flex items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/5">
+                    {entry ? (
+                      <CheckCircle2Icon className="size-4 text-tx-confirmed" />
+                    ) : isHashing ? (
+                      <Loader2Icon className="size-4 text-muted-foreground animate-spin" />
+                    ) : (
+                      <FileIcon className="size-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{file.name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{formatBytes(file.size)}</span>
+                      {entry && (
+                        <span className="font-mono">
+                          {entry.hash.slice(0, 10)}…{entry.hash.slice(-6)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {!isHashing && !isChecking && (
+                    <button
+                      onClick={() => dispatch({ type: "REMOVE_FILE", index: i })}
+                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      type="button"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      <XIcon className="size-4" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Add more files button */}
+          {!isHashing && !isChecking && (
             <button
-              onClick={() => {
-                dispatch({ type: "SET_FILE", file: state.file! })
-                // Reset by re-dispatching a fresh file pick
-                inputRef.current?.click()
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              onClick={() => addMoreRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
               type="button"
             >
-              Change
+              <PlusIcon className="size-3.5" />
+              Add more files
             </button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPTED_EXTENSIONS.join(",")}
-              className="hidden"
-              onChange={onInputChange}
-            />
-          </div>
+          )}
+          <input
+            ref={addMoreRef}
+            type="file"
+            multiple
+            accept={ACCEPTED_EXTENSIONS.join(",")}
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
 
           {/* Hashing progress */}
           {isHashing && (
@@ -172,7 +204,7 @@ export function Step1File({ state, dispatch }: Props) {
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Loader2Icon className="size-3 animate-spin" />
-                  Computing blake3 hash…
+                  Computing blake3 hashes…
                 </span>
                 <span>{state.hashProgress}%</span>
               </div>
@@ -190,14 +222,19 @@ export function Step1File({ state, dispatch }: Props) {
 
           {/* Success state */}
           {isOk && (
-            <div className="space-y-2">
+            <div className="space-y-2 pt-1 border-t border-border/50">
               <div className="flex items-center gap-1.5 text-xs text-tx-confirmed">
                 <CheckCircle2Icon className="size-3.5" />
                 Unique — no duplicate found
               </div>
-              <p className="font-mono text-xs text-muted-foreground break-all">
-                blake3: {state.modelHash.slice(0, 16)}…{state.modelHash.slice(-8)}
-              </p>
+              <div className="space-y-0.5">
+                <p className="text-xs text-muted-foreground">
+                  {state.files.length} {state.files.length === 1 ? "file" : "files"} · {formatBytes(totalSize)} total
+                </p>
+                <p className="font-mono text-xs text-muted-foreground break-all">
+                  manifest: {state.modelHash.slice(0, 16)}…{state.modelHash.slice(-8)}
+                </p>
+              </div>
             </div>
           )}
 
@@ -209,7 +246,7 @@ export function Step1File({ state, dispatch }: Props) {
                 This model is already registered
               </div>
               <p className="text-xs text-destructive/80">
-                A model with this exact file hash exists on Handshake. Upload a different file or view the existing model.
+                A model with this exact manifest hash exists on Handshake. Upload different files or view the existing model.
               </p>
             </div>
           )}
