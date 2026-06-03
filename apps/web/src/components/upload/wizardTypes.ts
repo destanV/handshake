@@ -14,7 +14,11 @@ export type UploadStatus =
   | "getting_url"
   | "uploading_file"
   | "submitting"
-  | "success"
+  | "success" // uploaded to IPFS + saved to registry (not yet on-chain)
+  | "awaiting_signature" // waiting for the user to sign the registerModel tx
+  | "tx_pending" // tx sent, waiting for confirmation
+  | "onchain_confirmed" // registration confirmed on Fuji
+  | "onchain_skipped" // user chose to register later
   | "error"
 
 export type HashStatus = "idle" | "hashing" | "done"
@@ -67,6 +71,7 @@ export interface WizardState {
   uploadProgress: number // 0-100
   errorMessage: string
   createdModelId: string
+  createdMetadataCid: string // needed for the on-chain registerModel call
 }
 
 export type WizardAction =
@@ -108,5 +113,5 @@ export type WizardAction =
   | { type: "SET_UPLOAD_STATUS"; status: UploadStatus }
   | { type: "SET_UPLOAD_PROGRESS"; progress: number }
   | { type: "SET_ERROR"; message: string }
-  | { type: "SET_SUCCESS"; modelId: string }
+  | { type: "SET_SUCCESS"; modelId: string; metadataCid: string }
   | { type: "RESET" }

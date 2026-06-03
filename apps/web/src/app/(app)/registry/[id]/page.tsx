@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ShieldCheckIcon, ExternalLinkIcon } from "lucide-react"
 import Link from "next/link"
+import { OnChainProof } from "@/components/registry/OnChainProof"
 
 function truncateAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`
@@ -128,6 +129,9 @@ export default function ModelDetailPage({
           />
         </CardContent>
       </Card>
+
+      {/* On-chain proof / register CTA */}
+      <OnChainProof model={model} />
 
       {/* Lineage */}
       {model.baseModel && model.baseModel.length > 0 && (
