@@ -80,6 +80,13 @@ export class ProviderService implements OnModuleDestroy {
     this.ensureWs();
   }
 
+  /** Remove a handler so it is not re-attached on reconnect and is detached from the live WS. */
+  unsubscribe(event: string, handler: EventHandler): void {
+    const idx = this.handlers.findIndex((h) => h.event === event && h.handler === handler);
+    if (idx !== -1) this.handlers.splice(idx, 1);
+    this.wsContract?.off(event, handler);
+  }
+
   private ensureWs(): void {
     if (this.destroyed || this.wsProvider || !this.wsUrl || !this.registryAddress) return;
     try {
