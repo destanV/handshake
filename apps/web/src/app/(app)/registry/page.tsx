@@ -7,50 +7,61 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Task, Framework, BadgeLevel } from "@handshake/types"
+import { Task, Framework } from "@handshake/types"
 import type { IModel } from "@handshake/types"
-import { ShieldCheckIcon } from "lucide-react"
+import { DatabaseIcon, GitBranchIcon, ShieldCheckIcon } from "lucide-react"
+import { ProvenanceBadge } from "@/components/registry/ProvenanceBadge"
+import { formatBytes, truncateMiddle } from "@/lib/modelDisplay"
 
 function truncateAddress(addr: string) {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
-}
-
-function badgeLevelColor(level: BadgeLevel) {
-  const map: Record<BadgeLevel, string> = {
-    [BadgeLevel.Bronze]: "text-badge-bronze border-badge-bronze/30 bg-badge-bronze/10",
-    [BadgeLevel.Silver]: "text-badge-silver border-badge-silver/30 bg-badge-silver/10",
-    [BadgeLevel.Gold]: "text-badge-gold border-badge-gold/30 bg-badge-gold/10",
-    [BadgeLevel.Platinum]: "text-badge-platinum border-badge-platinum/30 bg-badge-platinum/10",
-  }
-  return map[level] ?? ""
+  return truncateMiddle(addr, 6, 4)
 }
 
 function ModelCard({ model }: { model: IModel }) {
+  const parentCount = model.baseModel?.length ?? 0
+  const datasetCount = model.trainingData?.datasets?.length ?? 0
+  const size = formatBytes(model.size)
+
   return (
     <Link href={`/registry/${model._id}`}>
       <Card className="h-full hover:border-white/25 hover:bg-card/80 transition-colors cursor-pointer">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-sm leading-snug line-clamp-1">{model.name}</CardTitle>
-            {model.onChainRegistered && (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium shrink-0 ${badgeLevelColor(BadgeLevel.Bronze)}`}>
-                <ShieldCheckIcon className="size-3" />
-                Verified
-              </span>
-            )}
+            <ProvenanceBadge
+              level={model.badgeLevel}
+              score={model.provenanceScore}
+              className="shrink-0"
+            />
           </div>
           <div className="flex flex-wrap gap-1.5 mt-1">
             <Badge variant="secondary" className="text-xs">{model.task}</Badge>
             <Badge variant="outline" className="text-xs">{model.framework}</Badge>
+            <Badge variant="outline" className="text-xs font-mono">{model.license}</Badge>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <CardDescription className="text-xs line-clamp-2 mb-3">
             {model.description ?? "No description provided."}
           </CardDescription>
-          <p className="text-xs text-muted-foreground font-mono">
-            {truncateAddress(model.ownerAddress)}
-          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <ShieldCheckIcon className="size-3" />
+              {model.onChainRegistered ? "On-chain" : "Off-chain"}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <GitBranchIcon className="size-3" />
+              {parentCount} parent{parentCount === 1 ? "" : "s"}
+            </span>
+            {datasetCount > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <DatabaseIcon className="size-3" />
+                {datasetCount} dataset{datasetCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {size && <span>{size}</span>}
+          </div>
+          <p className="text-xs text-muted-foreground font-mono">{truncateAddress(model.ownerAddress)}</p>
         </CardContent>
       </Card>
     </Link>
