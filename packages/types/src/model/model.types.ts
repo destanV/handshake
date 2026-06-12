@@ -1,4 +1,4 @@
-import { Framework, License, Quantization, Relationship, Source, Task } from "../enums";
+import { BadgeLevel, Framework, License, Quantization, Relationship, Source, Task } from "../enums";
 
 export interface IBlockchainRecord {
   txHash?: string;
@@ -41,6 +41,13 @@ export interface IParentRef {
   externalId?: string; // HF repo ID or URL
 }
 
+export interface IProvenanceCheck {
+  id: string;
+  label: string;
+  tier: BadgeLevel;
+  met: boolean;
+}
+
 export interface IModel {
   _id: string;
 
@@ -77,6 +84,11 @@ export interface IModel {
   // On-chain record (system, auto-filled)
   blockchain?: IBlockchainRecord;
   onChainRegistered: boolean;
+
+  // Computed provenance summary (API-filled, not persisted)
+  provenanceScore?: number;
+  badgeLevel?: BadgeLevel | null;
+  provenanceChecks?: IProvenanceCheck[];
 
   // stats (system, auto-filled), (e.g likes, downloads, etc)
 

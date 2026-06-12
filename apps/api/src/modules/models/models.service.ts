@@ -2,7 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ModelsRepository } from "./models.repository";
 import { IpfsService } from "../ipfs/ipfs.service";
 import { DomainException, DomainErrorCodes } from "@api/common/exceptions/domain.exception";
-import type { IModel, CreateModelDTO } from "@handshake/types";
+import { BadgeLevel, Source } from "@handshake/types";
+import type { IModel, CreateModelDTO, IProvenanceCheck } from "@handshake/types";
 import type { ListModelsQueryDto } from "./requests/list-models-query-dto";
 
 @Injectable()
@@ -23,9 +24,10 @@ export class ModelsService {
   }
 
   async listModels(filter: ListModelsQueryDto) {
-    const models = await this.repo.findAll(filter);
-    this.logger.debug(`Listed models: count=${Array.isArray(models) ? models.length : "?"} filter=${JSON.stringify(filter)}`);
-    return models;
+    const result = await this.repo.findAll(filter);
+    const models = await Promise.all(result.models.map((model) => this.withProvenanceSummary(model)));
+    this.logger.debug(`Listed models: count=${models.length} filter=${JSON.stringify(filter)}`);
+    return { ...result, models };
   }
 
   async getModel(id: string): Promise<IModel> {
@@ -36,7 +38,7 @@ export class ModelsService {
       throw new DomainException(DomainErrorCodes.MODEL_NOT_FOUND);
     }
 
-    return model;
+    return this.withProvenanceSummary(model);
   }
 
   async createModel(dto: CreateModelDTO, ownerAddress: string): Promise<IModel> {
@@ -63,34 +65,107 @@ export class ModelsService {
     });
 
     this.logger.log(`Model created: name="${dto.name}" owner=${ownerAddress} hash=${dto.modelHash.slice(0, 16)}...`);
-    return model;
+    return this.withProvenanceSummary(model);
   }
 
-  // prototype
-  calculateProvenanceScore(model: IModel): number {
+  private hasText(value: unknown): boolean {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  private hasArrayItems(value: unknown[] | undefined): boolean {
+    return Array.isArray(value) && value.length > 0;
+  }
+
+  private async hasOnChainHandshakeParent(model: IModel): Promise<boolean> {
+    const parents = model.baseModel ?? [];
+    for (const parent of parents) {
+      if (parent.source !== Source.Handshake || !parent.handshakeId) continue;
+      try {
+        const parentModel = await this.repo.findById(parent.handshakeId);
+        if (parentModel?.onChainRegistered) return true;
+      } catch {
+        continue;
+      }
+    }
+    return false;
+  }
+
+  async withProvenanceSummary(model: IModel): Promise<IModel> {
+    const hasLineage = this.hasArrayItems(model.baseModel);
+    const hasDataset = this.hasArrayItems(model.trainingData?.datasets);
+    const hasDescription = (model.description?.trim().length ?? 0) > 50;
+    const hasBenchmarks = this.hasArrayItems(model.evaluation?.benchmarks);
+    const hasIntendedUse = this.hasText(model.intendedUse);
+    const hasLanguages = this.hasArrayItems(model.languages);
+    const hasTrainingData =
+      this.hasText(model.trainingData?.summary) ||
+      this.hasArrayItems(model.trainingData?.datasets) ||
+      this.hasText(model.trainingData?.privacyMeasures);
+    const hasEvaluation =
+      this.hasArrayItems(model.evaluation?.benchmarks) || this.hasText(model.evaluation?.limitations);
+    const hasCompleteMetadata =
+      this.hasText(model.modelType) &&
+      this.hasText(model.parameters) &&
+      typeof model.contextLength === "number" &&
+      model.contextLength > 0 &&
+      this.hasText(model.quantization) &&
+      this.hasArrayItems(model.tags) &&
+      hasTrainingData &&
+      hasEvaluation &&
+      hasLanguages &&
+      hasIntendedUse;
+    const hasOnChainParent = await this.hasOnChainHandshakeParent(model);
+
+    const bronzeChecks: IProvenanceCheck[] = [
+      { id: "on-chain", label: "On-chain registration", tier: BadgeLevel.Bronze, met: model.onChainRegistered },
+      { id: "model-hash", label: "Model hash", tier: BadgeLevel.Bronze, met: this.hasText(model.modelHash) },
+      { id: "license", label: "License", tier: BadgeLevel.Bronze, met: this.hasText(model.license) },
+    ];
+    const silverChecks: IProvenanceCheck[] = [
+      { id: "lineage", label: "Lineage declared", tier: BadgeLevel.Silver, met: hasLineage },
+      { id: "dataset", label: "Dataset declared", tier: BadgeLevel.Silver, met: hasDataset },
+      { id: "description", label: "Detailed description", tier: BadgeLevel.Silver, met: hasDescription },
+    ];
+    const goldChecks: IProvenanceCheck[] = [
+      { id: "benchmarks", label: "Benchmark results", tier: BadgeLevel.Gold, met: hasBenchmarks },
+      { id: "intended-use", label: "Intended use", tier: BadgeLevel.Gold, met: hasIntendedUse },
+      { id: "languages", label: "Languages declared", tier: BadgeLevel.Gold, met: hasLanguages },
+    ];
+    const platinumChecks: IProvenanceCheck[] = [
+      { id: "on-chain-parent", label: "On-chain Handshake parent", tier: BadgeLevel.Platinum, met: hasOnChainParent },
+      { id: "complete-metadata", label: "Complete metadata", tier: BadgeLevel.Platinum, met: hasCompleteMetadata },
+    ];
+
+    const bronzeMet = bronzeChecks.every((check) => check.met);
+    const silverMet = bronzeMet && silverChecks.every((check) => check.met);
+    const goldMet = silverMet && goldChecks.every((check) => check.met);
+    const platinumMet = goldMet && platinumChecks.every((check) => check.met);
+
     let score = 0;
+    let badgeLevel: BadgeLevel | null = null;
 
-    // Bronze base: onChainRegistered + modelHash + license
-    if (model.onChainRegistered && model.modelHash && model.license) {
+    if (bronzeMet) {
       score += 40;
+      badgeLevel = BadgeLevel.Bronze;
     }
-
-    // Silver +20: baseModel declared + 1+ dataset + description > 50 chars
-    const hasLineage = Array.isArray(model.baseModel) && model.baseModel.length > 0;
-    const hasDataset = (model.trainingData?.datasets?.length ?? 0) >= 1;
-    const hasDescription = (model.description?.length ?? 0) > 50;
-    if (hasLineage && hasDataset && hasDescription) {
+    if (silverMet) {
       score += 20;
+      badgeLevel = BadgeLevel.Silver;
     }
-
-    // Gold +20: benchmarks + intendedUse + languages
-    const hasBenchmarks = (model.evaluation?.benchmarks?.length ?? 0) > 0;
-    const hasIntendedUse = Boolean(model.intendedUse);
-    const hasLanguages = (model.languages?.length ?? 0) > 0;
-    if (hasBenchmarks && hasIntendedUse && hasLanguages) {
+    if (goldMet) {
       score += 20;
+      badgeLevel = BadgeLevel.Gold;
+    }
+    if (platinumMet) {
+      score += 20;
+      badgeLevel = BadgeLevel.Platinum;
     }
 
-    return score;
+    return {
+      ...model,
+      provenanceScore: score,
+      badgeLevel,
+      provenanceChecks: [...bronzeChecks, ...silverChecks, ...goldChecks, ...platinumChecks],
+    };
   }
 }

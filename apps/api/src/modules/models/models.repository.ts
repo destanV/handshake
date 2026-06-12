@@ -12,12 +12,15 @@ export class ModelsRepository {
   async findAll(filter: {
     owner?: string;
     task?: string;
+    framework?: string;
   }): Promise<{ models: IModel[]; total: number }> {
     const query: Record<string, string> = {};
 
     if (filter.owner) query.ownerAddress = filter.owner;
 
     if (filter.task) query.task = filter.task;
+
+    if (filter.framework) query.framework = filter.framework;
 
     const [models, total] = await Promise.all([
       this.modelModel.find(query).sort({ createdAt: -1 }).lean<IModel[]>().exec(),
