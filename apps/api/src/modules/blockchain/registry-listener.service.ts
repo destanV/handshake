@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { OnModuleInit } from "@nestjs/common";
+import type { OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import type { ContractEventPayload, Log, EventLog } from "ethers";
 import { toCanonicalHash } from "@handshake/contracts";
 import { ModelsService } from "../models/models.service";
@@ -10,7 +10,7 @@ import { ProviderService } from "./provider.service";
 // writes (Decision I). modelHash is normalized to the canonical (no-0x, lowercase) form before
 // matching Mongo (Invariant 2).
 @Injectable()
-export class RegistryListenerService implements OnModuleInit {
+export class RegistryListenerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RegistryListenerService.name);
 
   constructor(
@@ -51,5 +51,11 @@ export class RegistryListenerService implements OnModuleInit {
       chainId: this.provider.chainId,
       registeredAt,
     });
+  }
+
+  onModuleDestroy(): void {
+    if (!this.provider.hasRegistry()) return;
+    this.provider.unsubscribe("ModelRegistered", this.onModelRegistered);
+    this.logger.log("Stopped listening for ModelRegistered.");
   }
 }

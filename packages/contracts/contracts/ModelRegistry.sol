@@ -1,20 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @title ModelRegistry
-/// @notice Provenance registry for AI models on Avalanche Fuji (chainId 43113).
-/// @dev On-chain is the source of truth for `(modelHash => owner, metadataCID, in-registry parents)`.
-///      License, version, tags, lifecycle (isActive) and external (HuggingFace) lineage are
-///      intentionally kept OFF-chain (Mongo / IPFS metadata) — see Phase-2 spec Decisions A, B, C, L.
-///
-///      Ownership front-running: `modelHash` is public in the mempool, so a bot can observe a pending
-///      `registerModel` and claim the hash from another wallet first. `registerModel` is therefore
-///      documented as front-runnable. The commit-reveal path (`commit`/`reveal`) mitigates this: a
-///      sealed `commit(keccak256(abi.encode(modelHash, salt, msg.sender)))` binds `msg.sender`, so an
-///      observer cannot pre-commit a matching commitment for someone else's reveal. Residual cost is
-///      two signatures / two transactions and client-side salt custody. See Decision N.
-///
-///      No reentrancy surface: no state-changing function performs an external call (Decision G).
+/// @notice Provenance registry for AI models on Avalanche Fuji.
+/// @dev Ownership front-running (modelHash is public in the mempool) is mitigated by a two-step
+///      commit-reveal: commit(keccak256(modelHash, salt, msg.sender)) then reveal. The commitment
+///      binds msg.sender, so an observer cannot pre-commit a matching commitment for another
+///      account's reveal. Direct registerModel remains available but is documented as front-runnable.
 contract ModelRegistry {
     struct Model {
         bytes32 modelHash; // blake3 of manifest JSON; primary key
