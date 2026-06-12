@@ -98,6 +98,24 @@ export async function createModel(dto: CreateModelDTO): Promise<IModel> {
   })
 }
 
+export interface BlockchainRecordPayload {
+  txHash: string
+  blockNumber?: number
+  contractAddress?: string
+  chainId?: number
+}
+
+/** Records a confirmed on-chain registration on the model (owner-only, idempotent). */
+export async function patchBlockchainRecord(
+  modelId: string,
+  payload: BlockchainRecordPayload
+): Promise<IModel> {
+  return request(`/models/${modelId}/blockchain`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  })
+}
+
 // ─── IPFS ────────────────────────────────────────────────────────────────────
 
 export async function fetchSignedUrl(

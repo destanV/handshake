@@ -3,7 +3,7 @@ import { InjectModel } from "@nestjs/mongoose";
 import type { Model } from "mongoose";
 import type { ModelDocument } from "./schemas";
 import { ModelRecord } from "./schemas";
-import type { IModel } from "@handshake/types";
+import type { IModel, IBlockchainRecord } from "@handshake/types";
 
 @Injectable()
 export class ModelsRepository {
@@ -43,5 +43,36 @@ export class ModelsRepository {
     const created = await this.modelModel.create(data);
 
     return created.toObject() as unknown as IModel;
+  }
+
+  async findByHash(hash: string): Promise<IModel | null> {
+    return this.modelModel.findOne({ modelHash: hash }).lean<IModel>().exec();
+  }
+
+  /** Owner-verified path (PATCH): set the on-chain record by document id. */
+  async setBlockchainById(id: string, record: IBlockchainRecord): Promise<IModel | null> {
+    return this.modelModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { blockchain: record, onChainRegistered: true } },
+        { new: true },
+      )
+      .lean<IModel>()
+      .exec();
+  }
+
+  /** Chain-sync path (listener/cron): set the on-chain record by canonical modelHash. */
+  async updateBlockchainByHash(
+    hashCanonical: string,
+    record: IBlockchainRecord,
+  ): Promise<IModel | null> {
+    return this.modelModel
+      .findOneAndUpdate(
+        { modelHash: hashCanonical },
+        { $set: { blockchain: record, onChainRegistered: true } },
+        { new: true },
+      )
+      .lean<IModel>()
+      .exec();
   }
 }

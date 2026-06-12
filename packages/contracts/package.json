@@ -1,0 +1,50 @@
+{
+  "name": "@handshake/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "abi",
+    "deployments",
+    "contracts"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./abi": "./abi/ModelRegistry.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp -R abi deployments dist/",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "check-types": "tsc --noEmit -p tsconfig.build.json",
+    "extract-abi": "node scripts/extract-abi.js",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:fuji": "hardhat run scripts/deploy.ts --network avalancheFuji",
+    "demo:local": "hardhat run scripts/demo-seed.ts --network localhost",
+    "demo:fuji": "hardhat run scripts/demo-seed.ts --network avalancheFuji",
+    "verify:fuji": "hardhat verify --network avalancheFuji"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.13",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.0.0",
+    "chai": "^4.5.0",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.16.0",
+    "hardhat": "^2.26.0",
+    "hardhat-gas-reporter": "^2.2.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  }
+}
