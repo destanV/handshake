@@ -10,6 +10,12 @@
     "format": "prettier --write \"**/*.{ts,tsx,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json}\"",
     "test": "turbo test",
+    "seed:all": "pnpm --filter @handshake/e2e-seed-pipeline seed:all",
+    "seed:fund": "pnpm --filter @handshake/e2e-seed-pipeline seed:fund",
+    "seed:hf-fetch": "pnpm --filter @handshake/e2e-seed-pipeline seed:hf-fetch",
+    "seed:api": "pnpm --filter @handshake/e2e-seed-pipeline seed:api",
+    "seed:onchain": "pnpm --filter @handshake/e2e-seed-pipeline seed:onchain",
+    "seed:verify": "pnpm --filter @handshake/e2e-seed-pipeline seed:verify",
     "clean": "turbo clean; find . -name 'dist' -type d -not -path '*/node_modules/*' | xargs rm -rf; find . -name '.turbo' -type d -not -path '*/node_modules/*' | xargs rm -rf"
   },
   "devDependencies": {

@@ -14,3 +14,8 @@ coverage
 .idea
 CLAUDE.md
 .playwright-mcp
+tools/e2e-seed-pipeline/.seed-output/
+tools/e2e-seed-pipeline/hf-cache/
+tools/e2e-seed-pipeline/staging/
+tools/e2e-seed-pipeline/seed-report.jsonl
+tools/e2e-seed-pipeline/wallets.json

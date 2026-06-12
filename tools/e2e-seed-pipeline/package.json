@@ -1,0 +1,32 @@
+{
+  "name": "@handshake/e2e-seed-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "handshake-e2e-seed": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc --noEmit -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test \"dist/**/*.test.js\"",
+    "seed:all": "pnpm run build && node dist/cli.js seed:all",
+    "seed:fund": "pnpm run build && node dist/cli.js seed:fund",
+    "seed:hf-fetch": "pnpm run build && node dist/cli.js seed:hf-fetch",
+    "seed:api": "pnpm run build && node dist/cli.js seed:api",
+    "seed:onchain": "pnpm run build && node dist/cli.js seed:onchain",
+    "seed:verify": "pnpm run build && node dist/cli.js seed:verify",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@handshake/contracts": "workspace:*",
+    "@handshake/types": "workspace:*",
+    "@noble/hashes": "2.0.1",
+    "siwe": "2.3.2",
+    "viem": "2.47.6"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.37",
+    "typescript": "5.9.3"
+  }
+}
