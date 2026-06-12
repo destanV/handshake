@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +8,36 @@ import type { RuntimeConfig } from "./types.js";
 const DEFAULT_FUJI_RPC = "https://api.avax-test.network/ext/bc/C/rpc";
 const DEFAULT_CHAIN_ID = 43113;
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(packageRoot, "../..");
+
+function loadDotEnvFile(filePath: string): void {
+  if (!existsSync(filePath)) return;
+
+  const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const index = trimmed.indexOf("=");
+    if (index <= 0) continue;
+
+    const key = trimmed.slice(0, index).trim();
+    let value = trimmed.slice(index + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] ??= value;
+  }
+}
+
+function loadSeedEnv(): void {
+  loadDotEnvFile(path.join(repoRoot, ".env"));
+  loadDotEnvFile(path.join(packageRoot, ".env"));
+}
 
 function readInt(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -33,6 +64,8 @@ function readAddress(name: string, fallback?: string): `0x${string}` {
 }
 
 export async function loadConfig(): Promise<RuntimeConfig> {
+  loadSeedEnv();
+
   const chainId = readInt("SEED_CHAIN_ID", Number(process.env.CHAIN_ID) || DEFAULT_CHAIN_ID);
   const registryAddress = readAddress(
     "SEED_REGISTRY_ADDRESS",

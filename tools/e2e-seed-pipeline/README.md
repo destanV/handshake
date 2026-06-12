@@ -19,6 +19,8 @@ pnpm seed:verify
 
 `seed:all` runs funding, Hugging Face fetch/staging, API creation, on-chain registration, and verification.
 
+`seed:all -- --dry-run` does not require secrets. If `SEED_MNEMONIC` is missing, it uses the public test mnemonic `test test test test test test test test test test test junk` only for wallet and DTO planning.
+
 ## Required Environment
 
 ```sh

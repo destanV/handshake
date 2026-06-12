@@ -11,6 +11,17 @@ import { verifySeed } from "./verify.js";
 
 const DRY_RUN_HASH = "0".repeat(64);
 const DRY_RUN_CID = "bafybeihandshakeseeddryrunmetadataonly0000000000000000000000";
+const DRY_RUN_MNEMONIC = "test test test test test test test test test test test junk";
+
+function dryRunHashFor(index: number): string {
+  return (index + 1).toString(16).padStart(64, "0");
+}
+
+function seedMnemonicFor(config: RuntimeConfig, dryRun: boolean): string {
+  if (config.mnemonic) return config.mnemonic;
+  if (dryRun) return DRY_RUN_MNEMONIC;
+  return requireMnemonic(config);
+}
 
 export async function runHfFetch(config: RuntimeConfig, dryRun: boolean): Promise<void> {
   const staged = await stageHfModels(config, dryRun);
@@ -31,7 +42,7 @@ export async function runFund(config: RuntimeConfig, dryRun: boolean): Promise<v
 }
 
 export async function runApi(config: RuntimeConfig, dryRun: boolean): Promise<ApiSeedRecord[]> {
-  const mnemonic = requireMnemonic(config);
+  const mnemonic = seedMnemonicFor(config, dryRun);
   const wallets = deriveSeedWallets(mnemonic, config.modelCount);
   await persistWalletMetadata(config, wallets);
   const stagedModels = await stageHfModels(config, dryRun);
@@ -43,9 +54,31 @@ export async function runApi(config: RuntimeConfig, dryRun: boolean): Promise<Ap
     if (!wallet) throw new Error(`Missing derived wallet at index ${index}`);
 
     if (dryRun) {
-      const dto = buildCreateModelDto(staged, DRY_RUN_CID, records, DRY_RUN_HASH);
+      const modelHash = dryRunHashFor(index);
+      const dto = buildCreateModelDto(staged, DRY_RUN_CID, records, modelHash);
       const parsed = CreateModelSchema.safeParse(dto);
       if (!parsed.success) throw new Error(`Dry-run DTO failed validation for ${staged.fixture.repoId}`);
+      const dryRunModelId = `dry-run-${index}`;
+      const record: ApiSeedRecord = {
+        repoId: staged.fixture.repoId,
+        walletIndex: index,
+        walletAddress: wallet.account.address,
+        modelId: dryRunModelId,
+        modelHash,
+        modelFileCid: DRY_RUN_CID,
+        metadataCid: DRY_RUN_CID,
+        apiModel: {
+          ...dto,
+          _id: dryRunModelId,
+          ownerAddress: wallet.account.address,
+          metadataCid: DRY_RUN_CID,
+          onChainRegistered: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      };
+      records.set(staged.fixture.repoId, record);
+      output.push(record);
       console.log(
         `would create API model ${staged.fixture.repoId} as wallet[${index}] ${wallet.account.address}`,
       );
@@ -108,7 +141,7 @@ export async function runApi(config: RuntimeConfig, dryRun: boolean): Promise<Ap
 }
 
 export async function runOnChain(config: RuntimeConfig, dryRun: boolean): Promise<OnChainSeedRecord[]> {
-  const mnemonic = requireMnemonic(config);
+  const mnemonic = seedMnemonicFor(config, dryRun);
   const wallets = deriveSeedWallets(mnemonic, config.modelCount);
   const state = await readSeedState(config);
   if (!state.api?.length) {
@@ -142,7 +175,6 @@ export async function runVerify(config: RuntimeConfig): Promise<void> {
 
 export async function runAll(config: RuntimeConfig, dryRun: boolean): Promise<void> {
   if (dryRun) {
-    requireMnemonic(config);
     await runApi(config, true);
     console.log(`would fund ${config.modelCount} wallets`);
     console.log(`would send ${config.modelCount} registerModel transactions`);
