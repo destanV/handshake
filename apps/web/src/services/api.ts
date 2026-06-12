@@ -3,6 +3,7 @@ import type {
   ModelListResponse,
   CheckDuplicateResponse,
   CreateModelDTO,
+  CompleteExternalRegistrationDTO,
 } from "@handshake/types"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
@@ -86,9 +87,31 @@ export async function fetchModel(id: string): Promise<IModel> {
 }
 
 export async function checkModelHash(
-  hash: string
+  hash: string,
+  caller?: string
 ): Promise<CheckDuplicateResponse> {
-  return request(`/models/check/${hash}`)
+  const qs = caller ? `?caller=${encodeURIComponent(caller)}` : ''
+  return request(`/models/check/${hash}${qs}`)
+}
+
+export async function fetchPendingExternal(): Promise<IModel[]> {
+  return request('/models/pending-external')
+}
+
+export async function prefetchMetadata(
+  cid: string
+): Promise<Record<string, unknown> | { prefetchFailed: true }> {
+  return request(`/models/prefetch-metadata?cid=${encodeURIComponent(cid)}`)
+}
+
+export async function completeExternalRegistration(
+  modelId: string,
+  dto: CompleteExternalRegistrationDTO
+): Promise<IModel> {
+  return request(`/models/${modelId}/complete`, {
+    method: 'PATCH',
+    body: JSON.stringify(dto),
+  })
 }
 
 export async function createModel(dto: CreateModelDTO): Promise<IModel> {

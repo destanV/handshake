@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Separator } from "@/components/ui/separator"
 import { AppSidebar } from "@/components/AppSidebar"
 import { WalletConnectButton } from "@/components/WalletConnectButton"
+import { ExternalPendingPopup } from "@/components/ExternalPendingPopup"
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -25,6 +26,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           {children}
         </SidebarInset>
       </SidebarProvider>
+      <ExternalPendingPopup />
     </TooltipProvider>
   )
 }

@@ -41,16 +41,23 @@ export class RegistryListenerService implements OnModuleInit, OnModuleDestroy {
     if (!parsed) return;
 
     const canonical = toCanonicalHash(parsed.args.modelHash as string);
+    const ownerAddress = parsed.args.owner as string;
+    const metadataCid = parsed.args.metadataCID as string;
     const block = await this.provider.http.getBlock(log.blockNumber);
     const registeredAt = block ? new Date(block.timestamp * 1000) : new Date();
 
-    await this.models.syncFromChain(canonical, {
-      txHash: log.transactionHash,
-      blockNumber: log.blockNumber,
-      contractAddress: this.provider.registryAddress,
-      chainId: this.provider.chainId,
-      registeredAt,
-    });
+    await this.models.syncFromChain(
+      canonical,
+      {
+        txHash: log.transactionHash,
+        blockNumber: log.blockNumber,
+        contractAddress: this.provider.registryAddress,
+        chainId: this.provider.chainId,
+        registeredAt,
+      },
+      ownerAddress,
+      metadataCid,
+    );
   }
 
   onModuleDestroy(): void {
