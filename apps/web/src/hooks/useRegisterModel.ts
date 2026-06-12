@@ -23,6 +23,12 @@ export function parseRevertReason(e: unknown): string {
   if (/AlreadyRegistered/i.test(msg)) return "This model hash is already registered on-chain."
   if (/ParentNotRegistered/i.test(msg)) return "A selected parent isn't registered on-chain yet."
   if (/TooManyParents/i.test(msg)) return "Too many on-chain parents (max 8)."
+  if (/CommitmentExists/i.test(msg)) return "A commitment for this model has already been made."
+  if (/NoCommitment/i.test(msg))
+    return "No matching commitment found. It may have expired or the salt is wrong."
+  if (/CommitTooRecent/i.test(msg))
+    return "Reveal is too soon. Wait for the commit transaction to have at least one confirmation."
+  if (/CommitExpired/i.test(msg)) return "The commitment has expired. Please start over."
   if (/insufficient funds|insufficient.*gas/i.test(msg)) return "Insufficient AVAX for gas."
   if (/user rejected|user denied|rejected the request/i.test(msg)) return "Signature rejected."
   return msg
@@ -226,6 +232,8 @@ export function useCommitRevealRegister(modelHash: string) {
       if (commitReceipt.data.status === "reverted") {
         setStatus("error")
         setErrorMessage("Commit transaction reverted.")
+        clearCommit(modelHash)
+        setRecord(null)
       } else {
         setStatus((s) => (s === "confirmed" ? s : "committed"))
       }
@@ -244,8 +252,12 @@ export function useCommitRevealRegister(modelHash: string) {
     }
     if (revealReceipt.data) {
       if (revealReceipt.data.status === "reverted") {
-        setStatus("error")
-        setErrorMessage("Reveal transaction reverted.")
+        setStatus("committed")
+        setErrorMessage("Reveal transaction reverted. You may be able to try again.")
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(pendingTxKey(modelHash))
+        }
+        setRevealTxHash(undefined)
       } else {
         setStatus("confirmed")
         clearCommit(modelHash)
