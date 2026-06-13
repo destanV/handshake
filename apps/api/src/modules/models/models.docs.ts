@@ -30,9 +30,10 @@ export const UpdateBlockchainDocs = () =>
 
 export const ListModelsDocs = () =>
   applyDecorators(
-    ApiOperation({ summary: "List models", description: "Returns all models. Optionally filter by owner address or task type." }),
+    ApiOperation({ summary: "List models", description: "Returns all models with computed provenance badge fields. Optionally filter by owner address, task, or framework." }),
     ApiQuery({ name: "owner", required: false, description: "Filter by wallet address" }),
     ApiQuery({ name: "task", required: false, description: "Filter by task type", enum: ["text-generation", "image-classification", "object-detection", "text-classification", "token-classification", "question-answering", "summarization", "translation", "text-to-image", "image-to-text", "audio-classification", "other"] }),
+    ApiQuery({ name: "framework", required: false, description: "Filter by framework", enum: ["pytorch", "tensorflow", "jax", "onnx", "other"] }),
     ApiResponse({ status: 200, description: "List of models" }),
   );
 
@@ -106,7 +107,7 @@ export const CreateModelDocs = () =>
           tags: { type: "array", items: { type: "string" }, example: ["legal", "llm"] },
           languages: { type: "array", items: { type: "string" }, example: ["en", "tr"] },
           intendedUse: { type: "string", description: "EU AI Act Annex IV field", example: "Legal document summarization" },
-          size: { type: "number", description: "File size in MB", example: 16000 },
+          size: { type: "number", description: "File size in bytes", example: 16000000000 },
           quantization: { type: "string", enum: ["none", "int8", "int4", "gptq", "awq"] },
           parameters: { type: "string", example: "8B" },
           contextLength: { type: "number", example: 8192 },

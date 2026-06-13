@@ -23,9 +23,10 @@ export class ModelsService {
   }
 
   async listModels(filter: ListModelsQueryDto) {
-    const models = await this.repo.findAll(filter);
-    this.logger.debug(`Listed models: count=${Array.isArray(models) ? models.length : "?"} filter=${JSON.stringify(filter)}`);
-    return models;
+    const result = await this.repo.findAll(filter);
+    const models = await Promise.all(result.models.map((model) => this.withProvenanceSummary(model)));
+    this.logger.debug(`Listed models: count=${models.length} filter=${JSON.stringify(filter)}`);
+    return { ...result, models };
   }
 
   async getModel(id: string): Promise<IModel> {
@@ -36,7 +37,7 @@ export class ModelsService {
       throw new DomainException(DomainErrorCodes.MODEL_NOT_FOUND);
     }
 
-    return model;
+    return this.withProvenanceSummary(model);
   }
 
   async createModel(dto: CreateModelDTO, ownerAddress: string): Promise<IModel> {
@@ -63,7 +64,7 @@ export class ModelsService {
     });
 
     this.logger.log(`Model created: name="${dto.name}" owner=${ownerAddress} hash=${dto.modelHash.slice(0, 16)}...`);
-    return model;
+    return this.withProvenanceSummary(model);
   }
 
   // PATCH /models/:id/blockchain — owner-only, idempotent. Records the user's confirmed tx.
@@ -119,28 +120,30 @@ export class ModelsService {
   // prototype
   calculateProvenanceScore(model: IModel): number {
     let score = 0;
+    let badgeLevel: BadgeLevel | null = null;
 
-    // Bronze base: onChainRegistered + modelHash + license
-    if (model.onChainRegistered && model.modelHash && model.license) {
+    if (bronzeMet) {
       score += 40;
+      badgeLevel = BadgeLevel.Bronze;
     }
-
-    // Silver +20: baseModel declared + 1+ dataset + description > 50 chars
-    const hasLineage = Array.isArray(model.baseModel) && model.baseModel.length > 0;
-    const hasDataset = (model.trainingData?.datasets?.length ?? 0) >= 1;
-    const hasDescription = (model.description?.length ?? 0) > 50;
-    if (hasLineage && hasDataset && hasDescription) {
+    if (silverMet) {
       score += 20;
+      badgeLevel = BadgeLevel.Silver;
     }
-
-    // Gold +20: benchmarks + intendedUse + languages
-    const hasBenchmarks = (model.evaluation?.benchmarks?.length ?? 0) > 0;
-    const hasIntendedUse = Boolean(model.intendedUse);
-    const hasLanguages = (model.languages?.length ?? 0) > 0;
-    if (hasBenchmarks && hasIntendedUse && hasLanguages) {
+    if (goldMet) {
       score += 20;
+      badgeLevel = BadgeLevel.Gold;
+    }
+    if (platinumMet) {
+      score += 20;
+      badgeLevel = BadgeLevel.Platinum;
     }
 
-    return score;
+    return {
+      ...model,
+      provenanceScore: score,
+      badgeLevel,
+      provenanceChecks: [...bronzeChecks, ...silverChecks, ...goldChecks, ...platinumChecks],
+    };
   }
 }
