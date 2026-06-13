@@ -1,18 +1,17 @@
 "use client"
 
 import type { Dispatch } from "react"
-import Link from "next/link"
 import {
   CheckCircle2Icon,
   CircleIcon,
   Loader2Icon,
   AlertCircleIcon,
-  ExternalLinkIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { useWizardUpload } from "./useWizardUpload"
+import { RegisterOnChain } from "./RegisterOnChain"
 import type { WizardState, WizardAction } from "./wizardTypes"
 
 function formatBytes(bytes: number): string {
@@ -66,29 +65,37 @@ export function Step5Summary({ state, dispatch }: Props) {
     state.uploadStatus === "uploading_file" ||
     state.uploadStatus === "submitting"
 
-  if (state.uploadStatus === "success") {
+  const isUploaded =
+    state.uploadStatus === "success" ||
+    state.uploadStatus === "awaiting_signature" ||
+    state.uploadStatus === "tx_pending" ||
+    state.uploadStatus === "onchain_confirmed" ||
+    state.uploadStatus === "onchain_skipped"
+
+  if (isUploaded) {
     return (
-      <div className="flex flex-col items-center justify-center gap-5 py-16 text-center">
+      <div className="flex flex-col items-center justify-center gap-5 py-12 text-center">
         <div className="flex size-16 items-center justify-center rounded-full bg-tx-confirmed/10">
           <CheckCircle2Icon className="size-8 text-tx-confirmed" />
         </div>
         <div className="space-y-1">
-          <p className="text-lg font-semibold">Model registered</p>
+          <p className="text-lg font-semibold">Model uploaded</p>
           <p className="text-sm text-muted-foreground">
-            Your model has been hashed, uploaded to IPFS, and saved to the registry.
+            Hashed, uploaded to IPFS, and saved to the registry. One optional step remains.
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button asChild>
-            <Link href={`/registry/${state.createdModelId}`}>
-              View model
-              <ExternalLinkIcon className="size-3.5 ml-1.5" />
-            </Link>
-          </Button>
-          <Button variant="outline" onClick={() => dispatch({ type: "RESET" })}>
-            Upload another
-          </Button>
-        </div>
+
+        <RegisterOnChain
+          modelId={state.createdModelId}
+          modelHash={state.modelHash}
+          metadataCid={state.createdMetadataCid}
+          baseModel={state.lineageType === "from_scratch" ? [] : state.baseModel}
+          dispatch={dispatch}
+        />
+
+        <Button variant="ghost" size="sm" onClick={() => dispatch({ type: "RESET" })}>
+          Upload another
+        </Button>
       </div>
     )
   }

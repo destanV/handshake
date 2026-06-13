@@ -29,6 +29,7 @@ export const initialState: WizardState = {
   uploadProgress: 0,
   errorMessage: "",
   createdModelId: "",
+  createdMetadataCid: "",
 }
 
 export function wizardReducer(
@@ -112,6 +113,7 @@ export function wizardReducer(
         ...state,
         uploadStatus: "success",
         createdModelId: action.modelId,
+        createdMetadataCid: action.metadataCid,
       }
 
     case "RESET":

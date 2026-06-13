@@ -112,7 +112,7 @@ export function useWizardUpload(
       const dto = buildDTO(state, cid)
       const model = await createModel(dto)
 
-      dispatch({ type: "SET_SUCCESS", modelId: model._id })
+      dispatch({ type: "SET_SUCCESS", modelId: model._id, metadataCid: model.metadataCid })
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed"
       dispatch({ type: "SET_ERROR", message: msg })

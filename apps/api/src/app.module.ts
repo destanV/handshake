@@ -4,6 +4,7 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { ModelsModule } from "./modules/models/models.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { IpfsModule } from "./modules/ipfs/ipfs.module";
+import { BlockchainModule } from "./modules/blockchain/blockchain.module";
 import { LoggerMiddleware } from "./common/middleware/logger.middleware";
 
 @Module({
@@ -12,6 +13,7 @@ import { LoggerMiddleware } from "./common/middleware/logger.middleware";
     AuthModule,
     ModelsModule,
     IpfsModule,
+    BlockchainModule,
   ],
 })
 export class AppModule implements NestModule {

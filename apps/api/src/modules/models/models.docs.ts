@@ -1,6 +1,33 @@
 import { applyDecorators } from "@nestjs/common";
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from "@nestjs/swagger";
 
+export const UpdateBlockchainDocs = () =>
+  applyDecorators(
+    ApiCookieAuth(),
+    ApiOperation({
+      summary: "Record an on-chain registration",
+      description:
+        "Owner-only. Called by the frontend after the user's registerModel tx confirms. Stores the txHash/blockNumber/contractAddress/chainId on the model and flips onChainRegistered. Idempotent — replaying the same txHash is a no-op. The backend listener/cron reconciles the same data from chain events independently.",
+    }),
+    ApiParam({ name: "id", description: "MongoDB ObjectId of the model" }),
+    ApiBody({
+      schema: {
+        type: "object",
+        required: ["txHash"],
+        properties: {
+          txHash: { type: "string", example: "0x" + "ab".repeat(32) },
+          blockNumber: { type: "number", example: 12345678 },
+          contractAddress: { type: "string", example: "0x" + "cd".repeat(20) },
+          chainId: { type: "number", example: 43113 },
+        },
+      },
+    }),
+    ApiResponse({ status: 200, description: "Blockchain record stored" }),
+    ApiResponse({ status: 401, description: "Not authenticated" }),
+    ApiResponse({ status: 403, description: "Caller is not the model owner" }),
+    ApiResponse({ status: 404, description: "Model not found" }),
+  );
+
 export const ListModelsDocs = () =>
   applyDecorators(
     ApiOperation({ summary: "List models", description: "Returns all models with computed provenance badge fields. Optionally filter by owner address, task, or framework." }),

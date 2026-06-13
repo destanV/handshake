@@ -87,3 +87,13 @@ export class ModelRecord {
 }
 
 export const ModelSchema = SchemaFactory.createForClass(ModelRecord);
+
+// Unique only among documents that actually carry an on-chain txHash (partial index). Enforces
+// idempotency at the DB layer: the same registration tx can never populate two model docs (T6).
+ModelSchema.index(
+  { "blockchain.txHash": 1 },
+  {
+    unique: true,
+    partialFilterExpression: { "blockchain.txHash": { $type: "string" } },
+  },
+);
