@@ -2,7 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ModelsRepository } from "./models.repository";
 import { IpfsService } from "../ipfs/ipfs.service";
 import { DomainException, DomainErrorCodes } from "@api/common/exceptions/domain.exception";
-import type { IModel, CreateModelDTO, IBlockchainRecord } from "@handshake/types";
+import { BadgeLevel, Source } from "@handshake/types";
+import type { IModel, CreateModelDTO, IBlockchainRecord, IProvenanceCheck } from "@handshake/types";
 import type { ListModelsQueryDto } from "./requests/list-models-query-dto";
 
 @Injectable()
@@ -86,7 +87,7 @@ export class ModelsService {
 
     // Idempotent: the same tx already recorded -> no-op.
     if (model.onChainRegistered && model.blockchain?.txHash === record.txHash) {
-      return model;
+      return this.withProvenanceSummary(model);
     }
 
     const updated = await this.repo.setBlockchainById(id, {
@@ -96,7 +97,7 @@ export class ModelsService {
     if (!updated) throw new DomainException(DomainErrorCodes.MODEL_NOT_FOUND);
 
     this.logger.log(`Blockchain record set: id=${id} tx=${record.txHash} owner=${callerAddress}`);
-    return updated;
+    return this.withProvenanceSummary(updated);
   }
 
   // Called by the on-chain listener/cron. On-chain is truth (Decision 3): no owner check, idempotent.
@@ -117,8 +118,79 @@ export class ModelsService {
     return { found: true, updated: true };
   }
 
-  // prototype
-  calculateProvenanceScore(model: IModel): number {
+  private hasText(value: unknown): boolean {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  private hasArrayItems(value: unknown[] | undefined): boolean {
+    return Array.isArray(value) && value.length > 0;
+  }
+
+  private async hasOnChainHandshakeParent(model: IModel): Promise<boolean> {
+    const parents = model.baseModel ?? [];
+    for (const parent of parents) {
+      if (parent.source !== Source.Handshake || !parent.handshakeId) continue;
+      try {
+        const parentModel = await this.repo.findById(parent.handshakeId);
+        if (parentModel?.onChainRegistered) return true;
+      } catch {
+        continue;
+      }
+    }
+    return false;
+  }
+
+  async withProvenanceSummary(model: IModel): Promise<IModel> {
+    const hasLineage = this.hasArrayItems(model.baseModel);
+    const hasDataset = this.hasArrayItems(model.trainingData?.datasets);
+    const hasDescription = (model.description?.trim().length ?? 0) > 50;
+    const hasBenchmarks = this.hasArrayItems(model.evaluation?.benchmarks);
+    const hasIntendedUse = this.hasText(model.intendedUse);
+    const hasLanguages = this.hasArrayItems(model.languages);
+    const hasTrainingData =
+      this.hasText(model.trainingData?.summary) ||
+      this.hasArrayItems(model.trainingData?.datasets) ||
+      this.hasText(model.trainingData?.privacyMeasures);
+    const hasEvaluation =
+      this.hasArrayItems(model.evaluation?.benchmarks) || this.hasText(model.evaluation?.limitations);
+    const hasCompleteMetadata =
+      this.hasText(model.modelType) &&
+      this.hasText(model.parameters) &&
+      typeof model.contextLength === "number" &&
+      model.contextLength > 0 &&
+      this.hasText(model.quantization) &&
+      this.hasArrayItems(model.tags) &&
+      hasTrainingData &&
+      hasEvaluation &&
+      hasLanguages &&
+      hasIntendedUse;
+    const hasOnChainParent = await this.hasOnChainHandshakeParent(model);
+
+    const bronzeChecks: IProvenanceCheck[] = [
+      { id: "on-chain", label: "On-chain registration", tier: BadgeLevel.Bronze, met: model.onChainRegistered },
+      { id: "model-hash", label: "Model hash", tier: BadgeLevel.Bronze, met: this.hasText(model.modelHash) },
+      { id: "license", label: "License", tier: BadgeLevel.Bronze, met: this.hasText(model.license) },
+    ];
+    const silverChecks: IProvenanceCheck[] = [
+      { id: "lineage", label: "Lineage declared", tier: BadgeLevel.Silver, met: hasLineage },
+      { id: "dataset", label: "Dataset declared", tier: BadgeLevel.Silver, met: hasDataset },
+      { id: "description", label: "Detailed description", tier: BadgeLevel.Silver, met: hasDescription },
+    ];
+    const goldChecks: IProvenanceCheck[] = [
+      { id: "benchmarks", label: "Benchmark results", tier: BadgeLevel.Gold, met: hasBenchmarks },
+      { id: "intended-use", label: "Intended use", tier: BadgeLevel.Gold, met: hasIntendedUse },
+      { id: "languages", label: "Languages declared", tier: BadgeLevel.Gold, met: hasLanguages },
+    ];
+    const platinumChecks: IProvenanceCheck[] = [
+      { id: "on-chain-parent", label: "On-chain Handshake parent", tier: BadgeLevel.Platinum, met: hasOnChainParent },
+      { id: "complete-metadata", label: "Complete metadata", tier: BadgeLevel.Platinum, met: hasCompleteMetadata },
+    ];
+
+    const bronzeMet = bronzeChecks.every((check) => check.met);
+    const silverMet = bronzeMet && silverChecks.every((check) => check.met);
+    const goldMet = silverMet && goldChecks.every((check) => check.met);
+    const platinumMet = goldMet && platinumChecks.every((check) => check.met);
+
     let score = 0;
     let badgeLevel: BadgeLevel | null = null;
 

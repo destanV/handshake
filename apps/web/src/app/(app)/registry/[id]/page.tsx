@@ -11,8 +11,6 @@ import { useModel } from "@/hooks/useModels"
 import { formatBytes, truncateMiddle } from "@/lib/modelDisplay"
 import { ExternalLinkIcon, CheckCircle2Icon, CircleIcon } from "lucide-react"
 import type { IBenchmark, IDataset, IModel, IProvenanceCheck } from "@handshake/types"
-import { ShieldCheckIcon, ExternalLinkIcon } from "lucide-react"
-import Link from "next/link"
 import { OnChainProof } from "@/components/registry/OnChainProof"
 
 function truncateAddress(addr: string) {
