@@ -10,16 +10,15 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
 
-FROM base AS deps
+FROM base AS pruner
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc turbo.json tsconfig.json ./
-COPY apps/web/package.json apps/web/package.json
-COPY packages/contracts/package.json packages/contracts/package.json
-COPY packages/types/package.json packages/types/package.json
+RUN pnpm add --global turbo@2.8.21
 
-RUN pnpm install --frozen-lockfile
+COPY . .
 
-FROM deps AS builder
+RUN turbo prune @handshake/web --docker
+
+FROM base AS builder
 
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
 ARG NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
@@ -27,11 +26,13 @@ ARG NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 
-COPY . .
+COPY --from=pruner /app/out/json/ .
 
-RUN pnpm --filter @handshake/types build \
-  && pnpm --filter @handshake/contracts build \
-  && pnpm --filter @handshake/web build
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+COPY --from=pruner /app/out/full/ .
+
+RUN pnpm turbo run build --filter=@handshake/web...
 
 FROM node:22-bookworm-slim AS runner
 
