@@ -1,0 +1,86 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+      NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ vars.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check deployment variables
+        run: |
+          if [ -z "$NEXT_PUBLIC_API_URL" ]; then
+            echo "Missing GitHub variable: NEXT_PUBLIC_API_URL"
+            exit 1
+          fi
+
+      - name: Build API image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f apps/api/Dockerfile \
+            -t handshake-api:local \
+            .
+
+      - name: Build Web image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
+            --build-arg NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID="$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID" \
+            -t handshake-web:local \
+            .
+
+      - name: Pull Caddy image
+        run: docker pull --platform linux/amd64 caddy:2-alpine
+
+      - name: Pack images
+        run: |
+          docker save handshake-api:local handshake-web:local caddy:2-alpine | gzip > handshake-images.tar.gz
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DROPLET_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload images
+        run: |
+          scp -i ~/.ssh/deploy_key handshake-images.tar.gz \
+            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/opt/handshake/handshake-images.tar.gz
+
+      - name: Deploy on Droplet
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} << 'EOF'
+            set -e
+            cd /opt/handshake
+
+            git fetch origin master
+            git reset --hard origin/master
+
+            gunzip -c handshake-images.tar.gz | docker load
+            rm -f handshake-images.tar.gz
+
+            docker compose down --remove-orphans
+            docker compose up -d --no-build
+            docker compose ps
+            docker image prune -f
+          EOF
