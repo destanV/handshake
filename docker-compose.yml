@@ -17,7 +17,7 @@ services:
       - caddy_config:/config
 
   api:
-    image: handshake-api:local
+    image: ${API_IMAGE:-handshake-api:local}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -38,7 +38,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: handshake-web:local
+    image: ${WEB_IMAGE:-handshake-web:local}
     build:
       context: .
       dockerfile: apps/web/Dockerfile

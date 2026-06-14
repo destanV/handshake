@@ -9,24 +9,23 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
 
-FROM base AS deps
+FROM base AS pruner
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc turbo.json tsconfig.json ./
-COPY apps/api/package.json apps/api/package.json
-COPY packages/config/package.json packages/config/package.json
-COPY packages/contracts/package.json packages/contracts/package.json
-COPY packages/types/package.json packages/types/package.json
-
-RUN pnpm install --frozen-lockfile
-
-FROM deps AS builder
+RUN pnpm add --global turbo@2.8.21
 
 COPY . .
 
-RUN pnpm --filter @handshake/config build \
-  && pnpm --filter @handshake/types build \
-  && pnpm --filter @handshake/contracts build \
-  && pnpm --filter @handshake/api build
+RUN turbo prune @handshake/api --docker
+
+FROM base AS builder
+
+COPY --from=pruner /app/out/json/ .
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+COPY --from=pruner /app/out/full/ .
+
+RUN pnpm turbo run build --filter=@handshake/api...
 
 FROM base AS runner
 
@@ -39,7 +38,7 @@ COPY packages/config/package.json packages/config/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/types/package.json packages/types/package.json
 
-RUN pnpm install --frozen-lockfile --prod
+RUN --mount=type=cache,id=pnpm-prod,target=/pnpm/store pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/apps/api/dist apps/api/dist
 COPY --from=builder /app/packages/config/dist packages/config/dist

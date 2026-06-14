@@ -80,8 +80,8 @@ pnpm --filter @handshake/contracts build
 
 Production deployment icin repo iki image kullanir:
 
-- `handshake-api:local`
-- `handshake-web:local`
+- `handshake-api:local` veya `API_IMAGE`
+- `handshake-web:local` veya `WEB_IMAGE`
 
 Caddy, `WEB_DOMAIN` ve `API_DOMAIN` ile web/API reverse proxy ve HTTPS terminasyonunu yapar. Deployment env degerleri `.env.example` dosyasindaki alanlara gore doldurulur.
 
@@ -91,7 +91,9 @@ Sunucuda image'lar hazirsa uygulamayi baslatmak icin:
 docker compose up -d --no-build
 ```
 
-GitHub Actions workflow'u `master` push'unda image'lari `linux/amd64` olarak build eder, Droplet'e yukler ve `docker compose up -d --no-build` ile deploy eder.
+GitHub Actions workflow'u `master` push'unda image'lari `linux/amd64` olarak Turbo prune ve Docker BuildKit cache ile build eder, GHCR'a push eder, Droplet'te GHCR'dan pull edip `docker compose up -d --no-build` ile deploy eder.
+
+CI/CD icin GitHub Actions secrets olarak `DROPLET_HOST`, `DROPLET_USER`, `DROPLET_SSH_KEY`, `GHCR_USERNAME` ve `GHCR_READ_TOKEN`; variables olarak `NEXT_PUBLIC_API_URL` ve `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` kullanilir.
 
 ## Sorun Giderme
 
