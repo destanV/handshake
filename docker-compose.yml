@@ -1,38 +1,33 @@
-version: '3.8'
-
 services:
-  mongo:
-    image: mongo:7
-    ports:
-      - '27017:27017'
-    volumes:
-      - mongo_data:/data/db
-    restart: unless-stopped
-
   api:
+    image: handshake-api:local
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    ports:
-      - '4000:4000'
-    depends_on:
-      - mongo
-      - redis
     env_file:
-      - apps/api/.env
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
+    ports:
+      - '${API_HOST_PORT:-4000}:4000'
     restart: unless-stopped
 
   web:
+    image: handshake-web:local
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
     ports:
-      - '3000:3000'
+      - '${WEB_HOST_PORT:-3000}:3000'
     depends_on:
       - api
-    env_file:
-      - apps/web/.env.local
     restart: unless-stopped
-
-volumes:
-  mongo_data:
