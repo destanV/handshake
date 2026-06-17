@@ -90,6 +90,9 @@ export interface IModel {
   badgeLevel?: BadgeLevel | null;
   provenanceChecks?: IProvenanceCheck[];
 
+  // 'external_pending' = registered on-chain directly, awaiting Handshake completion
+  status: 'active' | 'external_pending';
+
   // stats (system, auto-filled), (e.g likes, downloads, etc)
 
   //timestamps

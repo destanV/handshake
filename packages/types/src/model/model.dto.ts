@@ -32,6 +32,28 @@ export interface CreateModelDTO {
 export interface CheckDuplicateResponse {
   exists: boolean;
   modelId?: string;
+  status?: 'active' | 'external_pending';
+  isOwner?: boolean;
+}
+
+export interface CompleteExternalRegistrationDTO {
+  name: string;
+  description: string;
+  version: string;
+  task: Task;
+  framework: Framework;
+  license: License;
+  baseModel?: IParentRef[];
+  trainingData?: ITrainingData;
+  tags?: string[];
+  evaluation?: IEvaluation;
+  languages?: string[];
+  intendedUse?: string;
+  size?: number;
+  modelType?: string;
+  parameters?: string;
+  contextLength?: number;
+  quantization?: Quantization;
 }
 
 export interface ModelListResponse {

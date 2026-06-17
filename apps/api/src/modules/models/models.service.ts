@@ -3,7 +3,13 @@ import { ModelsRepository } from "./models.repository";
 import { IpfsService } from "../ipfs/ipfs.service";
 import { DomainException, DomainErrorCodes } from "@api/common/exceptions/domain.exception";
 import { BadgeLevel, Source } from "@handshake/types";
-import type { IModel, CreateModelDTO, IBlockchainRecord, IProvenanceCheck } from "@handshake/types";
+import type {
+  IModel,
+  CreateModelDTO,
+  IBlockchainRecord,
+  IProvenanceCheck,
+  CompleteExternalRegistrationDTO,
+} from "@handshake/types";
 import type { ListModelsQueryDto } from "./requests/list-models-query-dto";
 
 @Injectable()
@@ -15,10 +21,10 @@ export class ModelsService {
     private readonly ipfsService: IpfsService,
   ) {}
 
-  async checkDuplicate(hash: string) {
-    const result = await this.repo.existsByHash(hash);
+  async checkDuplicate(hash: string, callerAddress?: string) {
+    const result = await this.repo.existsByHash(hash, callerAddress);
     if (result.exists) {
-      this.logger.debug(`Duplicate check hit: hash=${hash.slice(0, 16)}...`);
+      this.logger.debug(`Duplicate check hit: hash=${hash.slice(0, 16)}... status=${result.status}`);
     }
     return result;
   }
@@ -42,7 +48,7 @@ export class ModelsService {
   }
 
   async createModel(dto: CreateModelDTO, ownerAddress: string): Promise<IModel> {
-    const { exists } = await this.repo.existsByHash(dto.modelHash);
+    const { exists } = await this.repo.existsByHash(dto.modelHash, ownerAddress);
 
     if (exists) {
       this.logger.warn(`Duplicate model upload rejected: hash=${dto.modelHash.slice(0, 16)}... owner=${ownerAddress}`);
@@ -62,6 +68,7 @@ export class ModelsService {
       tags: dto.tags ?? [],
       languages: dto.languages ?? [],
       onChainRegistered: false,
+      status: 'active',
     });
 
     this.logger.log(`Model created: name="${dto.name}" owner=${ownerAddress} hash=${dto.modelHash.slice(0, 16)}...`);
@@ -104,10 +111,22 @@ export class ModelsService {
   async syncFromChain(
     modelHashCanonical: string,
     record: IBlockchainRecord,
+    ownerAddress: string,
+    metadataCid: string,
   ): Promise<{ found: boolean; updated: boolean }> {
     const model = await this.repo.findByHash(modelHashCanonical);
     if (!model) {
-      this.logger.debug(`On-chain event for unknown model: hash=${modelHashCanonical.slice(0, 16)}… — skipped`);
+      // Unknown hash — registered on-chain directly, bypassing Handshake. Create a stub so the
+      // owning wallet can complete the upload through the platform on their next login.
+      await this.repo.createExternalStub({
+        modelHash: modelHashCanonical,
+        ownerAddress,
+        metadataCid,
+        blockchain: record,
+        onChainRegistered: true,
+        status: 'external_pending',
+      });
+      this.logger.log(`External stub created: hash=${modelHashCanonical.slice(0, 16)}… owner=${ownerAddress}`);
       return { found: false, updated: false };
     }
     if (model.onChainRegistered && model.blockchain?.txHash === record.txHash) {
@@ -116,6 +135,43 @@ export class ModelsService {
     await this.repo.updateBlockchainByHash(modelHashCanonical, record);
     this.logger.log(`Synced on-chain registration: hash=${modelHashCanonical.slice(0, 16)}… tx=${record.txHash}`);
     return { found: true, updated: true };
+  }
+
+  async getPendingExternal(ownerAddress: string): Promise<IModel[]> {
+    return this.repo.findExternalPendingByOwner(ownerAddress);
+  }
+
+  async prefetchMetadata(cid: string): Promise<Record<string, unknown> | null> {
+    return this.ipfsService.fetchMetadata(cid);
+  }
+
+  async completeExternalRegistration(
+    id: string,
+    dto: CompleteExternalRegistrationDTO,
+    callerAddress: string,
+  ): Promise<IModel> {
+    const model = await this.repo.findById(id);
+    if (!model) throw new DomainException(DomainErrorCodes.MODEL_NOT_FOUND);
+
+    if (model.ownerAddress.toLowerCase() !== callerAddress.toLowerCase()) {
+      this.logger.warn(`Complete denied: caller=${callerAddress} owner=${model.ownerAddress} id=${id}`);
+      throw new DomainException(DomainErrorCodes.FORBIDDEN);
+    }
+
+    if (model.status !== "external_pending") {
+      throw new DomainException(DomainErrorCodes.INVALID_STATUS);
+    }
+
+    const metadataCid = await this.ipfsService.uploadMetadata(
+      { ...dto, ownerAddress: callerAddress, modelHash: model.modelHash, createdAt: new Date().toISOString() },
+      callerAddress,
+    );
+
+    const updated = await this.repo.completeStub(id, { ...dto, metadataCid });
+    if (!updated) throw new DomainException(DomainErrorCodes.MODEL_NOT_FOUND);
+
+    this.logger.log(`External registration completed: id=${id} hash=${model.modelHash.slice(0, 16)}… owner=${callerAddress}`);
+    return this.withProvenanceSummary(updated);
   }
 
   private hasText(value: unknown): boolean {
@@ -190,7 +246,6 @@ export class ModelsService {
     const silverMet = bronzeMet && silverChecks.every((check) => check.met);
     const goldMet = silverMet && goldChecks.every((check) => check.met);
     const platinumMet = goldMet && platinumChecks.every((check) => check.met);
-
     let score = 0;
     let badgeLevel: BadgeLevel | null = null;
 

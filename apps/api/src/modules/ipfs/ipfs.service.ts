@@ -26,4 +26,19 @@ export class IpfsService {
     this.logger.debug(`Requesting signed upload URL: file="${fileName}" owner=${ownerAddress}`);
     return this.storage.createSignedUploadUrl({ fileName, ownerAddress });
   }
+
+  /** Fetch and parse a metadata JSON from IPFS. Returns null on any network or parse error. */
+  async fetchMetadata(cid: string): Promise<Record<string, unknown> | null> {
+    const gateway = process.env.PINATA_GATEWAY;
+    if (!gateway || !cid) return null;
+    try {
+      const res = await fetch(`https://${gateway}/ipfs/${cid}`);
+      if (!res.ok) return null;
+      const json = await res.json() as unknown;
+      if (typeof json !== 'object' || json === null || Array.isArray(json)) return null;
+      return json as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
 }

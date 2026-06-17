@@ -11,9 +11,10 @@ export type ModelDocument = ModelRecord & Document;
 
 @Schema({ timestamps: true })
 export class ModelRecord {
-  // Identity
-  @Prop({ required: true, index: true })
-  name: string;
+  // Identity (not required at Mongoose level — enforced by Zod for normal uploads;
+  // external stubs may omit these until the user completes their registration)
+  @Prop({ index: true })
+  name?: string;
 
   @Prop()
   description?: string;
@@ -21,14 +22,14 @@ export class ModelRecord {
   @Prop({ default: "1.0.0" })
   version: string;
 
-  @Prop({ required: true, enum: Object.values(Task), index: true })
-  task: string;
+  @Prop({ enum: Object.values(Task), index: true })
+  task?: string;
 
-  @Prop({ required: true, enum: Object.values(Framework) })
-  framework: string;
+  @Prop({ enum: Object.values(Framework) })
+  framework?: string;
 
-  @Prop({ required: true, enum: Object.values(License) })
-  license: string;
+  @Prop({ enum: Object.values(License) })
+  license?: string;
 
   @Prop()
   size?: number;
@@ -52,7 +53,7 @@ export class ModelRecord {
   @Prop({ required: true, unique: true, index: true })
   modelHash: string;
 
-  @Prop({ required: true })
+  @Prop({ default: "" })
   modelFileCid: string;
 
   @Prop({ default: "" })
@@ -78,12 +79,16 @@ export class ModelRecord {
   @Prop()
   intendedUse?: string;
 
-  // On-chain (Phase 3)
   @Prop({ default: false })
   onChainRegistered: boolean;
 
   @Prop({ type: BlockchainRecordSubSchema })
   blockchain?: IBlockchainRecord;
+
+  // 'active' = normal Handshake upload; 'external_pending' = registered on-chain directly,
+  // awaiting completion through the platform
+  @Prop({ enum: ['active', 'external_pending'], default: 'active' })
+  status: string;
 }
 
 export const ModelSchema = SchemaFactory.createForClass(ModelRecord);

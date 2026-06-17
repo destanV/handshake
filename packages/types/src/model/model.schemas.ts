@@ -56,6 +56,26 @@ export const CreateModelSchema = z.object({
   quantization: z.nativeEnum(Quantization).optional(),
 });
 
+export const CompleteExternalRegistrationSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().min(20, "Description must be at least 20 characters"),
+  version: z.string().default("1.0.0"),
+  task: z.nativeEnum(Task),
+  framework: z.nativeEnum(Framework),
+  license: z.nativeEnum(License),
+  baseModel: z.array(ParentRefSchema).optional(),
+  trainingData: TrainingDataSchema.optional(),
+  tags: z.array(z.string()).optional(),
+  evaluation: EvaluationSchema.optional(),
+  languages: z.array(z.string()).optional(),
+  intendedUse: z.string().optional(),
+  size: z.number().positive().optional(),
+  modelType: z.string().optional(),
+  parameters: z.string().optional(),
+  contextLength: z.number().positive().optional(),
+  quantization: z.nativeEnum(Quantization).optional(),
+});
+
 export const QueryModelParamsSchema = z.object({
   task: z.nativeEnum(Task).optional(),
   framework: z.nativeEnum(Framework).optional(),
