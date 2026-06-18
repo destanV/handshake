@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { ShaderAnimation } from "@/components/ui/shader-lines"
-import { useAuth } from "@/contexts/AuthContext"
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ShaderAnimation } from "@/components/ui/shader-lines";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LandingPage() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="relative h-svh w-full overflow-hidden flex items-center justify-center">
@@ -24,26 +24,13 @@ export default function LandingPage() {
         <div className="mt-8 flex items-center justify-center gap-3">
           <Button
             size="lg"
-            className="bg-white text-black hover:bg-white/90"
+            className="bg-white/10 text-white border border-white/20 hover:bg-white/20 backdrop-blur-sm"
             asChild
           >
             <Link href="/registry">Explore Registry</Link>
           </Button>
-          <Button
-            size="lg"
-            className="bg-white/10 text-white border border-white/20 hover:bg-white/20 backdrop-blur-sm"
-            disabled={!isAuthenticated}
-            asChild={isAuthenticated}
-            title={!isAuthenticated ? "Connect your wallet to upload" : undefined}
-          >
-            {isAuthenticated ? (
-              <Link href="/upload">Upload a Model</Link>
-            ) : (
-              <span>Upload a Model</span>
-            )}
-          </Button>
         </div>
       </div>
     </div>
-  )
+  );
 }
