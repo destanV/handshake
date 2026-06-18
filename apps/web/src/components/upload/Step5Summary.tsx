@@ -35,7 +35,23 @@ function calcProvenance(state: WizardState) {
     { label: "Intended use (EU AI Act)", met: state.intendedUse.trim().length > 0 },
     { label: "Language(s) declared", met: state.languages.length > 0 },
   ]
-  return { silver, gold }
+  const platinum: ProvenanceCheck[] = [
+    { label: "On-chain Handshake parent", met: state.baseModel.some((parent) => parent.source === "handshake") },
+    {
+      label: "Complete metadata",
+      met:
+        state.name.trim().length > 0 &&
+        state.description.trim().length > 0 &&
+        state.license.trim().length > 0 &&
+        state.task.trim().length > 0 &&
+        state.framework.trim().length > 0 &&
+        state.languages.length > 0 &&
+        state.intendedUse.trim().length > 0 &&
+        state.evaluation.benchmarks.length > 0 &&
+        state.trainingData.datasets.length > 0,
+    },
+  ]
+  return { silver, gold, platinum }
 }
 
 function CheckRow({ label, met }: ProvenanceCheck) {
@@ -58,7 +74,7 @@ interface Props {
 
 export function Step5Summary({ state, dispatch }: Props) {
   const { uploadModel } = useWizardUpload(state, dispatch)
-  const { silver, gold } = calcProvenance(state)
+  const { silver, gold, platinum } = calcProvenance(state)
 
   const isUploading =
     state.uploadStatus === "getting_url" ||
@@ -99,6 +115,8 @@ export function Step5Summary({ state, dispatch }: Props) {
       </div>
     )
   }
+
+  const platinumMet = platinum.every((c) => c.met)
 
   return (
     <div className="space-y-6">
@@ -207,6 +225,19 @@ export function Step5Summary({ state, dispatch }: Props) {
               <p className="text-xs font-medium text-badge-gold">Gold</p>
               <div className="space-y-1 pl-1">
                 {gold.map((c) => <CheckRow key={c.label} {...c} />)}
+              </div>
+            </div>
+
+            {/* Platinum */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-medium text-badge-platinum">Platinum</p>
+                <span className="text-xs text-muted-foreground">
+                  {platinumMet ? "— unlocked" : "— requires Gold + on-chain parent"}
+                </span>
+              </div>
+              <div className="space-y-1 pl-1">
+                {platinum.map((c) => <CheckRow key={c.label} {...c} />)}
               </div>
             </div>
           </div>

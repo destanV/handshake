@@ -1,11 +1,19 @@
 "use client"
 
-import { use } from "react"
+import { use, useState } from "react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
 import { ProvenanceBadge } from "@/components/registry/ProvenanceBadge"
 import { useModel } from "@/hooks/useModels"
 import { formatBytes, truncateMiddle } from "@/lib/modelDisplay"
@@ -19,6 +27,10 @@ function truncateAddress(addr: string) {
 
 function hasText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0
+}
+
+function isLongText(value: string) {
+  return value.trim().length > 220 || value.split(/\s+/).length > 35
 }
 
 function formatDate(value: Date | string | undefined) {
@@ -128,6 +140,40 @@ function BenchmarkRows({ benchmarks }: { benchmarks?: IBenchmark[] }) {
   )
 }
 
+function DescriptionBlock({ name, description }: { name: string; description: string }) {
+  const [open, setOpen] = useState(false)
+  const longText = isLongText(description)
+
+  return (
+    <>
+      <div className="space-y-2">
+        <p className={longText ? "text-sm text-muted-foreground leading-relaxed line-clamp-4" : "text-sm text-muted-foreground leading-relaxed"}>
+          {description}
+        </p>
+        {longText && (
+          <Button variant="ghost" size="xs" className="w-fit px-0 text-primary" onClick={() => setOpen(true)}>
+            Read full description
+          </Button>
+        )}
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="break-words">{name}</DialogTitle>
+            <DialogDescription>Full model description</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {description}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function hasTrainingData(model: IModel) {
   return (
     hasText(model.trainingData?.summary) ||
@@ -202,9 +248,7 @@ export default function ModelDetailPage({
           </Badge>
         </div>
 
-        {model.description && (
-          <p className="text-sm text-muted-foreground leading-relaxed">{model.description}</p>
-        )}
+        {model.description && <DescriptionBlock name={model.name} description={model.description} />}
       </div>
 
       <Separator />
