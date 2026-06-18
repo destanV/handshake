@@ -15,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Source, Relationship } from "@handshake/types"
 import type { IParentRef } from "@handshake/types"
+import { truncateMiddle } from "@/lib/modelDisplay"
+import { HandshakeParentPicker } from "./HandshakeParentPicker"
 import type { WizardState, WizardAction } from "./wizardTypes"
 
 const RELATIONSHIP_LABELS: Record<Relationship, string> = {
@@ -44,15 +46,27 @@ interface Props {
 export function Step3Lineage({ state, dispatch }: Props) {
   const [form, setForm] = useState(emptyParent())
   const [showForm, setShowForm] = useState(false)
+  const selectedHandshakeIds = state.baseModel
+    .map((parent) => parent.handshakeId)
+    .filter((id): id is string => Boolean(id))
+  const addDisabled =
+    !form.source ||
+    !form.relationship ||
+    (form.source === Source.Handshake
+      ? !form.handshakeId || !form.name.trim()
+      : !form.name.trim())
 
   function addParent() {
-    if (!form.source || !form.name.trim() || !form.relationship) return
+    if (addDisabled) return
     const parent: IParentRef = {
       source: form.source as Source,
       name: form.name.trim(),
       relationship: form.relationship as Relationship,
       ...(form.source === Source.Handshake && form.handshakeId
-        ? { handshakeId: form.handshakeId.trim() }
+        ? {
+            handshakeId: form.handshakeId.trim(),
+            ...(form.modelHash ? { modelHash: form.modelHash.trim() } : {}),
+          }
         : {}),
       ...(form.source !== Source.Handshake && form.externalId
         ? { externalId: form.externalId.trim() }
@@ -133,9 +147,11 @@ export function Step3Lineage({ state, dispatch }: Props) {
                     {parent.source}
                   </Badge>
                 </div>
-                {(parent.handshakeId || parent.externalId) && (
+                {(parent.handshakeId || parent.modelHash || parent.externalId) && (
                   <p className="text-xs text-muted-foreground font-mono">
-                    {parent.handshakeId ?? parent.externalId}
+                    {parent.source === Source.Handshake
+                      ? truncateMiddle(parent.modelHash ?? parent.handshakeId ?? "", 12, 8)
+                      : parent.externalId}
                   </p>
                 )}
               </div>
@@ -159,7 +175,16 @@ export function Step3Lineage({ state, dispatch }: Props) {
                   <Label className="text-xs">Source</Label>
                   <Select
                     value={form.source}
-                    onValueChange={(v) => setForm({ ...form, source: v as Source, handshakeId: "", externalId: "" })}
+                    onValueChange={(v) =>
+                      setForm({
+                        ...form,
+                        source: v as Source,
+                        name: "",
+                        handshakeId: "",
+                        modelHash: "",
+                        externalId: "",
+                      })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Source…" />
@@ -192,40 +217,50 @@ export function Step3Lineage({ state, dispatch }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs">Model name</Label>
-                <Input
-                  placeholder="e.g. meta-llama/Meta-Llama-3-8B"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              </div>
-
               {form.source === Source.Handshake && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Handshake model ID (optional)</Label>
-                  <Input
-                    placeholder="MongoDB ObjectId of the parent model"
-                    value={form.handshakeId}
-                    onChange={(e) => setForm({ ...form, handshakeId: e.target.value })}
+                  <Label className="text-xs">Handshake model</Label>
+                  <HandshakeParentPicker
+                    selectedModelId={form.handshakeId}
+                    excludedIds={selectedHandshakeIds}
+                    onSelect={(model) =>
+                      setForm({
+                        ...form,
+                        name: model.name,
+                        handshakeId: model._id,
+                        modelHash: model.modelHash,
+                        externalId: "",
+                      })
+                    }
                   />
                 </div>
               )}
 
               {form.source && form.source !== Source.Handshake && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">
-                    {form.source === Source.HuggingFace ? "HF repo ID" : "External URL / ID"} (optional)
-                  </Label>
-                  <Input
-                    placeholder={
-                      form.source === Source.HuggingFace
-                        ? "org/model-name"
-                        : "https://..."
-                    }
-                    value={form.externalId}
-                    onChange={(e) => setForm({ ...form, externalId: e.target.value })}
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Model name</Label>
+                    <Input
+                      placeholder="e.g. meta-llama/Meta-Llama-3-8B"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      {form.source === Source.HuggingFace ? "HF repo ID" : "External URL / ID"} (optional)
+                    </Label>
+                    <Input
+                      placeholder={
+                        form.source === Source.HuggingFace
+                          ? "org/model-name"
+                          : "https://..."
+                      }
+                      value={form.externalId}
+                      onChange={(e) => setForm({ ...form, externalId: e.target.value })}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -240,7 +275,7 @@ export function Step3Lineage({ state, dispatch }: Props) {
                 <Button
                   size="sm"
                   onClick={addParent}
-                  disabled={!form.source || !form.name.trim() || !form.relationship}
+                  disabled={addDisabled}
                 >
                   Add
                 </Button>
