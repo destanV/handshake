@@ -68,8 +68,6 @@ The contract can also be used directly outside the web app. The current public
 catalog remains API-first: raw contract-only registrations are not automatically
 published unless they match an existing Handshake model record.
 
-For a deeper implementation-level explanation, see [Architecture.md](./Architecture.md).
-
 ## Local Requirements
 
 Running the full stack locally is not the recommended review path. The app
